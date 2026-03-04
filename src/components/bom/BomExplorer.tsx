@@ -1,13 +1,19 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { parseCSV, buildTree, deriveGraph, expandPathToNode, DEMO_CSV, type TreeData, type BomRow } from '@/lib/bom';
+import { addCatalogItems } from '@/lib/warehouse';
 import BomGraph from './BomGraph';
 import { BomSidePanel, BomChildrenBrowser, BomSearchDialog } from './BomPanels';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Search, Home, ArrowLeft, Zap, FileSpreadsheet } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Upload, Search, ArrowLeft, Zap, FileSpreadsheet, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function BomExplorer() {
+interface Props {
+  onWarehouseRefresh?: () => void;
+}
+
+export default function BomExplorer({ onWarehouseRefresh }: Props) {
   const [tree, setTree] = useState<TreeData | null>(null);
   const [selectedRoot, setSelectedRoot] = useState<string>('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -15,6 +21,8 @@ export default function BomExplorer() {
   const [focusedNode, setFocusedNode] = useState<string | null>(null);
   const [browserParent, setBrowserParent] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
+  const [selectMode, setSelectMode] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Load CSV
@@ -28,6 +36,7 @@ export default function BomExplorer() {
       setExpandedNodes(new Set());
       setSelectedNode(null);
       setFocusedNode(null);
+      setCheckedItems(new Set());
       toast.success(`Loaded ${rows.length} items`);
     } catch (e: any) {
       toast.error('Failed to parse CSV: ' + e.message);
@@ -56,20 +65,15 @@ export default function BomExplorer() {
     setExpandedNodes(prev => {
       const next = new Set(prev);
       if (next.has(seq)) {
-        // Collapse: remove this and all descendants
         next.delete(seq);
         if (tree) {
           const removeDesc = (s: string) => {
             const children = tree.childrenMap.get(s) || [];
-            for (const c of children) {
-              next.delete(c.Seq);
-              removeDesc(c.Seq);
-            }
+            for (const c of children) { next.delete(c.Seq); removeDesc(c.Seq); }
           };
           removeDesc(seq);
         }
       } else {
-        // Check for cycles
         if (tree) {
           const visited = new Set<string>();
           let current: string | undefined = seq;
@@ -79,10 +83,7 @@ export default function BomExplorer() {
             visited.add(current);
             current = tree.parentMap.get(current);
           }
-          if (hasCycle) {
-            toast.error('Loop detected! Cannot expand this node.');
-            return prev;
-          }
+          if (hasCycle) { toast.error('Loop detected! Cannot expand this node.'); return prev; }
         }
         next.add(seq);
       }
@@ -90,38 +91,24 @@ export default function BomExplorer() {
     });
   }, [tree]);
 
-  const onSelect = useCallback((seq: string) => {
-    setSelectedNode(seq);
-  }, []);
-
+  const onSelect = useCallback((seq: string) => { setSelectedNode(seq); }, []);
   const onDoubleClick = useCallback((seq: string) => {
     setFocusedNode(seq);
     setExpandedNodes(prev => new Set(prev).add(seq));
   }, []);
-
-  const onUnfocus = useCallback(() => {
-    setFocusedNode(null);
-  }, []);
-
-  const onGoHome = useCallback(() => {
-    setFocusedNode(null);
-  }, []);
-
-  const onOpenBrowser = useCallback((seq: string) => {
-    setBrowserParent(seq);
-  }, []);
+  const onUnfocus = useCallback(() => { setFocusedNode(null); }, []);
+  const onOpenBrowser = useCallback((seq: string) => { setBrowserParent(seq); }, []);
 
   const onSearchSelect = useCallback((seq: string) => {
     if (!tree) return;
-    // Expand path to this node
     const pathSeqs = expandPathToNode(tree, seq);
     setExpandedNodes(prev => {
       const next = new Set(prev);
       for (const s of pathSeqs) next.add(s);
+      next.add(seq);
       return next;
     });
     setFocusedNode(seq);
-    setExpandedNodes(prev => new Set(prev).add(seq));
     setSelectedNode(seq);
   }, [tree]);
 
@@ -131,10 +118,10 @@ export default function BomExplorer() {
     setExpandedNodes(prev => {
       const next = new Set(prev);
       for (const s of pathSeqs) next.add(s);
+      next.add(seq);
       return next;
     });
     setFocusedNode(seq);
-    setExpandedNodes(prev => new Set(prev).add(seq));
     setSelectedNode(seq);
   }, [tree]);
 
@@ -142,6 +129,34 @@ export default function BomExplorer() {
     setFocusedNode(seq);
     setExpandedNodes(prev => new Set(prev).add(seq));
     setSelectedNode(seq);
+  }, []);
+
+  // Add to warehouse
+  const handleAddToWarehouse = useCallback(() => {
+    if (!tree || checkedItems.size === 0) return;
+    const items = Array.from(checkedItems).map(seq => {
+      const row = tree.rowBySeq.get(seq);
+      return row ? {
+        item_code: row.Item,
+        item_desc: row.ItemDesc,
+        created_from_bom: true,
+        source_project: tree.roots[0]?.Item || '',
+      } : null;
+    }).filter(Boolean) as { item_code: string; item_desc: string; created_from_bom: boolean; source_project: string }[];
+
+    const added = addCatalogItems(items);
+    toast.success(`Added ${added} items to Warehouse catalog. ${items.length - added > 0 ? `${items.length - added} already existed.` : ''} Quantities are managed in the Warehouse.`);
+    setCheckedItems(new Set());
+    setSelectMode(false);
+    onWarehouseRefresh?.();
+  }, [tree, checkedItems, onWarehouseRefresh]);
+
+  const toggleCheck = useCallback((seq: string) => {
+    setCheckedItems(prev => {
+      const next = new Set(prev);
+      if (next.has(seq)) next.delete(seq); else next.add(seq);
+      return next;
+    });
   }, []);
 
   // Derive graph
@@ -171,7 +186,6 @@ export default function BomExplorer() {
           <p className="text-muted-foreground mb-8">
             Visualize your Bill of Materials as an interactive graph. Upload a CSV from Priority ERP or try the demo.
           </p>
-
           <div className="space-y-3">
             <div
               className="border-2 border-dashed border-border rounded-xl p-8 hover:border-primary/50 transition-colors cursor-pointer"
@@ -186,7 +200,6 @@ export default function BomExplorer() {
               </p>
             </div>
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
-
             <Button
               variant="outline"
               className="w-full border-primary/30 text-primary hover:bg-primary/10"
@@ -202,14 +215,13 @@ export default function BomExplorer() {
   }
 
   return (
-    <div className="h-screen flex flex-col">
+    <div className="h-full flex flex-col">
       {/* Top bar */}
       <div className="h-14 border-b border-border flex items-center px-4 gap-3 bg-card/50 shrink-0">
         <Zap className="w-5 h-5 text-primary" />
         <span className="font-bold text-sm text-foreground">BOM WOW</span>
         <div className="w-px h-6 bg-border" />
 
-        {/* Root selector */}
         {tree.roots.length > 1 && (
           <select
             value={selectedRoot}
@@ -236,6 +248,23 @@ export default function BomExplorer() {
 
         <div className="flex-1" />
 
+        {/* Select mode for warehouse */}
+        <Button
+          size="sm"
+          variant={selectMode ? 'default' : 'outline'}
+          onClick={() => { setSelectMode(!selectMode); if (selectMode) setCheckedItems(new Set()); }}
+          className="gap-1"
+        >
+          <PackagePlus className="w-4 h-4" />
+          {selectMode ? `Selected (${checkedItems.size})` : 'Select for Warehouse'}
+        </Button>
+
+        {selectMode && checkedItems.size > 0 && (
+          <Button size="sm" onClick={handleAddToWarehouse} className="gap-1">
+            <PackagePlus className="w-4 h-4" /> Add to Warehouse
+          </Button>
+        )}
+
         <Button size="sm" variant="outline" onClick={() => setSearchOpen(true)} className="gap-2">
           <Search className="w-4 h-4" /> Search
           <kbd className="text-[10px] bg-secondary px-1.5 py-0.5 rounded">⌘K</kbd>
@@ -245,6 +274,28 @@ export default function BomExplorer() {
           New File
         </Button>
       </div>
+
+      {/* Select mode: item list with checkboxes */}
+      {selectMode && (
+        <div className="border-b border-border bg-card/30 px-4 py-2 flex items-center gap-4 overflow-x-auto">
+          <span className="text-xs text-muted-foreground shrink-0">Check items to add to Warehouse catalog:</span>
+          <div className="flex flex-wrap gap-2">
+            {tree.rows.slice(0, 200).map(row => (
+              <label
+                key={row.Seq}
+                className="flex items-center gap-1.5 px-2 py-1 rounded-md border border-border hover:bg-accent cursor-pointer text-xs"
+              >
+                <Checkbox
+                  checked={checkedItems.has(row.Seq)}
+                  onCheckedChange={() => toggleCheck(row.Seq)}
+                />
+                <span className="font-mono text-foreground">{row.Item}</span>
+              </label>
+            ))}
+            {tree.rows.length > 200 && <span className="text-xs text-muted-foreground">+{tree.rows.length - 200} more (use search)</span>}
+          </div>
+        </div>
+      )}
 
       {/* Graph */}
       <div className="flex-1">
