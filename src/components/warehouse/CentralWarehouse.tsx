@@ -1,0 +1,169 @@
+import React, { useState, useCallback, useMemo } from 'react';
+import {
+  getCatalog, updateCatalogItem, getCentralQty, setCentralQty,
+  getSerialsAtLocation, addSerialUnits, type CatalogItem,
+} from '@/lib/warehouse';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Search, Plus, Package, Hash } from 'lucide-react';
+import { toast } from 'sonner';
+
+interface Props {
+  onRefresh: () => void;
+  refreshKey: number;
+}
+
+export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
+  const [search, setSearch] = useState('');
+  const [addSerialDialog, setAddSerialDialog] = useState<string | null>(null);
+  const [serialInput, setSerialInput] = useState('');
+
+  const catalog = useMemo(() => getCatalog(), [refreshKey]);
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase();
+    return catalog.filter(c => c.item_code.toLowerCase().includes(q) || c.item_desc.toLowerCase().includes(q));
+  }, [catalog, search]);
+
+  const handleQtyChange = useCallback((item_code: string, val: string) => {
+    const qty = Math.max(0, parseInt(val) || 0);
+    setCentralQty(item_code, qty);
+    onRefresh();
+  }, [onRefresh]);
+
+  const toggleSerialized = useCallback((item_code: string, checked: boolean) => {
+    updateCatalogItem(item_code, { is_serialized: checked });
+    onRefresh();
+  }, [onRefresh]);
+
+  const handleAddSerials = useCallback(() => {
+    if (!addSerialDialog || !serialInput.trim()) return;
+    const numbers = serialInput.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+    if (numbers.length === 0) return;
+    const { added, duplicates } = addSerialUnits(addSerialDialog, numbers);
+    if (added > 0) toast.success(`Added ${added} serial(s)`);
+    if (duplicates.length > 0) toast.warning(`Skipped duplicates: ${duplicates.join(', ')}`);
+    setAddSerialDialog(null);
+    setSerialInput('');
+    onRefresh();
+  }, [addSerialDialog, serialInput, onRefresh]);
+
+  if (catalog.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4 p-8">
+        <Package className="w-16 h-16 opacity-30" />
+        <p className="text-lg font-medium">Warehouse catalog is empty</p>
+        <p className="text-sm">Add items from the BOM Explorer tab or create them manually.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="p-4 border-b border-border flex items-center gap-3">
+        <h2 className="font-bold text-foreground text-lg">Central Warehouse</h2>
+        <Badge variant="secondary">{catalog.length} items</Badge>
+        <div className="flex-1" />
+        <div className="relative w-64">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Search items..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8" />
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-auto p-4">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead className="w-40">Item Code</TableHead>
+              <TableHead>Description</TableHead>
+              <TableHead className="w-24 text-center">Serialized</TableHead>
+              <TableHead className="w-32 text-center">Qty On Hand</TableHead>
+              <TableHead className="w-20">Source</TableHead>
+              <TableHead className="w-32">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filtered.map(item => {
+              const isSer = item.is_serialized;
+              const centralSerials = isSer ? getSerialsAtLocation(item.item_code, 'CENTRAL') : [];
+              const centralQty = isSer ? centralSerials.length : getCentralQty(item.item_code);
+
+              return (
+                <TableRow key={item.item_code}>
+                  <TableCell className="font-mono font-bold text-foreground">{item.item_code}</TableCell>
+                  <TableCell className="text-muted-foreground">{item.item_desc}</TableCell>
+                  <TableCell className="text-center">
+                    <Checkbox
+                      checked={item.is_serialized}
+                      onCheckedChange={(checked) => toggleSerialized(item.item_code, !!checked)}
+                    />
+                  </TableCell>
+                  <TableCell className="text-center">
+                    {isSer ? (
+                      <div className="space-y-1">
+                        <Badge variant="outline" className="text-xs">{centralQty} units</Badge>
+                        {centralSerials.slice(0, 3).map(s => (
+                          <div key={s.serial_id} className="text-xs text-muted-foreground font-mono">{s.serial_number}</div>
+                        ))}
+                        {centralSerials.length > 3 && <div className="text-xs text-muted-foreground">+{centralSerials.length - 3} more</div>}
+                      </div>
+                    ) : (
+                      <Input
+                        type="number"
+                        min={0}
+                        className="w-20 text-center mx-auto"
+                        value={centralQty}
+                        onChange={e => handleQtyChange(item.item_code, e.target.value)}
+                      />
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {item.created_from_bom ? (
+                      <Badge variant="secondary" className="text-xs">BOM</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">Manual</Badge>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {isSer && (
+                      <Button size="sm" variant="outline" onClick={() => setAddSerialDialog(item.item_code)} className="gap-1">
+                        <Plus className="w-3 h-3" /> Add S/N
+                      </Button>
+                    )}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Add Serial Dialog */}
+      <Dialog open={!!addSerialDialog} onOpenChange={() => { setAddSerialDialog(null); setSerialInput(''); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Hash className="w-4 h-4" /> Add Serial Numbers
+            </DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">Item: <span className="font-mono font-bold text-foreground">{addSerialDialog}</span></p>
+          <p className="text-xs text-muted-foreground">Enter serial numbers separated by commas, semicolons, or new lines.</p>
+          <textarea
+            className="w-full h-32 rounded-md border border-input bg-background p-3 text-sm font-mono"
+            placeholder="SN001&#10;SN002&#10;SN003"
+            value={serialInput}
+            onChange={e => setSerialInput(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddSerialDialog(null); setSerialInput(''); }}>Cancel</Button>
+            <Button onClick={handleAddSerials}>Add Serials</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
