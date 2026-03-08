@@ -82,6 +82,20 @@ export function updateCatalogItem(item_code: string, updates: Partial<CatalogIte
   if (idx >= 0) { catalog[idx] = { ...catalog[idx], ...updates }; saveCatalog(catalog); }
 }
 
+export function isItemInLocations(item_code: string): boolean {
+  const locInv = getLocationInventory();
+  if (locInv.some(e => e.item_code === item_code && e.qty > 0)) return true;
+  const serials = getSerials();
+  return serials.some(u => u.item_code === item_code && u.current_location_id !== 'CENTRAL');
+}
+
+export function deleteCatalogItem(item_code: string) {
+  saveCatalog(getCatalog().filter(c => c.item_code !== item_code));
+  saveCentralInventory(getCentralInventory().filter(e => e.item_code !== item_code));
+  saveSerials(getSerials().filter(u => u.item_code !== item_code));
+  saveLocationInventory(getLocationInventory().filter(e => e.item_code !== item_code));
+}
+
 // ── Central Inventory (bulk) ──
 export function getCentralInventory(): CentralInventoryEntry[] { return load(KEYS.centralInv, []); }
 export function saveCentralInventory(inv: CentralInventoryEntry[]) { save(KEYS.centralInv, inv); }

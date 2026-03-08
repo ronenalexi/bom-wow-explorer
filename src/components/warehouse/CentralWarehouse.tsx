@@ -1,15 +1,17 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   getCatalog, updateCatalogItem, getCentralQty, setCentralQty,
-  getSerialsAtLocation, addSerialUnits, type CatalogItem,
+  getSerialsAtLocation, addSerialUnits, isItemInLocations, deleteCatalogItem,
+  type CatalogItem,
 } from '@/lib/warehouse';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Search, Plus, Package, Hash } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Search, Plus, Package, Hash, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
