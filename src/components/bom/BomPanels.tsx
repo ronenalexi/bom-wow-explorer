@@ -7,9 +7,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { ChevronRight, Search, ArrowUpDown, Leaf, FolderTree, X } from 'lucide-react';
+import { ChevronRight, Search, ArrowUpDown, Leaf, FolderTree, X, PackagePlus } from 'lucide-react';
 import type { BomRow, TreeData } from '@/lib/bom';
 import { getAncestors } from '@/lib/bom';
+import { addCatalogItems, getCatalog } from '@/lib/warehouse';
+import { toast } from 'sonner';
 
 // --- Side Panel ---
 interface SidePanelProps {
