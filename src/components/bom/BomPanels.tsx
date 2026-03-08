@@ -21,9 +21,10 @@ interface SidePanelProps {
   tree: TreeData;
   selectedSeq: string | null;
   onNavigate: (seq: string) => void;
+  onWarehouseRefresh?: () => void;
 }
 
-export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate }: SidePanelProps) {
+export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate, onWarehouseRefresh }: SidePanelProps) {
   const ancestors = useMemo(() => {
     if (!selectedSeq || !tree) return [];
     return getAncestors(tree, selectedSeq);
