@@ -173,32 +173,27 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                   <TableCell className="text-center">
                     {isSer ? (
                       <div className="space-y-1">
-                        <Badge variant="outline" className="text-xs">
-                          <span className={centralQty === 0 && totalQty > 0 ? 'text-destructive' : centralQty < totalQty ? 'text-amber-500' : 'text-foreground'}>
-                            {centralQty}/{totalQty}
-                          </span>
-                        </Badge>
+                        <Badge variant="outline" className="text-xs">{centralQty} units</Badge>
                         {centralSerials.slice(0, 3).map(s => (
                           <div key={s.serial_id} className="text-xs text-muted-foreground font-mono">{s.serial_number}</div>
                         ))}
                         {centralSerials.length > 3 && <div className="text-xs text-muted-foreground">+{centralSerials.length - 3} more</div>}
                       </div>
                     ) : (
-                      <div className="flex items-center justify-center gap-2">
-                        <Input
-                          type="number"
-                          min={0}
-                          className="w-20 text-center"
-                          value={centralQty}
-                          onChange={e => handleQtyChange(item.item_code, e.target.value)}
-                        />
-                        {totalQty > 0 && (
-                          <span className={`text-xs font-mono ${centralQty === 0 && totalQty > 0 ? 'text-destructive' : centralQty < totalQty ? 'text-amber-500' : 'text-muted-foreground'}`}>
-                            {centralQty}/{totalQty}
-                          </span>
-                        )}
-                      </div>
+                      <Input
+                        type="number"
+                        min={0}
+                        className="w-20 text-center mx-auto"
+                        value={centralQty}
+                        onChange={e => handleQtyChange(item.item_code, e.target.value)}
+                      />
                     )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className={`text-sm font-mono font-semibold ${centralQty === 0 && totalQty > 0 ? 'text-destructive' : centralQty < totalQty ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                      {totalQty}
+                    </span>
+                  </TableCell>
                   </TableCell>
                   <TableCell>
                     {item.created_from_bom ? (
