@@ -31,7 +31,7 @@ const FIELD_ALIASES: Record<BomField, string[]> = {
   Seq: ['seq', 'sequence', 'row', '#', 'line', 'row_number', 'row number', 'no', 'num'],
   Level: ['level', 'bom level', 'lvl', 'bom_level', 'depth', 'indent'],
   Item: ['item', 'part', 'part number', 'item_code', 'item code', 'component', 'part_number', 'partno', 'material', 'child', 'child item', 'child_item', 'item_no', 'item no', 'pn', 'sku'],
-  ItemDesc: ['description', 'item desc', 'item_desc', 'desc', 'name', 'item description', 'item_description', 'part description', 'component desc', 'component_desc', 'child desc', 'child_desc'],
+  ItemDesc: ['description', 'item desc', 'item_desc', 'desc', 'name', 'item description', 'item_description', 'part description', 'component desc', 'component_desc', 'child desc', 'child_desc', 'item name', 'item_name', 'part name', 'part_name', 'component name', 'component_name', 'material description', 'material_description', 'mat desc', 'mat_desc', 'תיאור', 'תיאור פריט', 'שם פריט'],
   Parent: ['parent', 'parent item', 'parent_item', 'parent_no', 'parent no', 'assy', 'assembly', 'parent part', 'parent_part'],
   ParentDesc: ['parent desc', 'parent_desc', 'parent description', 'parent_description', 'assy desc', 'assembly desc'],
   QtyPerParent: ['qty', 'quantity', 'qty per parent', 'qty_per_parent', 'qty per', 'qty_per', 'qtyper', 'unit qty', 'unit_qty', 'qty/parent'],
@@ -50,6 +50,7 @@ export function autoMatchHeaders(headers: string[]): ColumnMapping {
   const mapping: ColumnMapping = {};
   const usedHeaders = new Set<string>();
 
+  // Pass 1: Exact alias match
   for (const field of BOM_FIELDS) {
     const aliases = FIELD_ALIASES[field];
     for (const header of headers) {
@@ -62,6 +63,26 @@ export function autoMatchHeaders(headers: string[]): ColumnMapping {
       }
     }
   }
+
+  // Pass 2: Partial/contains match for unmatched fields
+  for (const field of BOM_FIELDS) {
+    if (mapping[field]) continue;
+    const aliases = FIELD_ALIASES[field];
+    for (const header of headers) {
+      if (usedHeaders.has(header)) continue;
+      const normalized = header.toLowerCase().trim();
+      // Check if any alias is contained in the header or vice versa
+      const matched = aliases.some(alias =>
+        normalized.includes(alias) || alias.includes(normalized)
+      );
+      if (matched) {
+        mapping[field] = header;
+        usedHeaders.add(header);
+        break;
+      }
+    }
+  }
+
   return mapping;
 }
 
