@@ -127,13 +127,8 @@ export default function BomSunburst({ tree, rootSeq, onSelect, selectedNode }: P
   // Arc click: zoom only for nodes with children, onSelect for leaves
   const handleArcClick = useCallback((seq: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const children = tree.childrenMap.get(seq) || [];
-    if (children.length > 0) {
-      setZoomRoot(seq);
-    } else {
-      onSelect(seq);
-    }
-  }, [tree, onSelect]);
+    setZoomRoot(seq);
+  }, []);
 
   // Center click: open side panel for the current zoomed item
   const handleCenterClick = useCallback(() => {
@@ -176,16 +171,6 @@ export default function BomSunburst({ tree, rootSeq, onSelect, selectedNode }: P
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-background relative select-none">
-      {/* Back button overlay */}
-      {zoomRoot && (
-        <button
-          onClick={handleBackClick}
-          className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 border border-border text-foreground text-xs font-medium transition-colors"
-        >
-          <Undo2 size={14} />
-          חזרה
-        </button>
-      )}
 
       <svg
         viewBox={viewBox}
@@ -197,22 +182,37 @@ export default function BomSunburst({ tree, rootSeq, onSelect, selectedNode }: P
         onMouseLeave={handleMouseUp}
       >
         <g transform={`translate(${panX}, ${panY}) scale(${scale})`}>
-          {/* Center circle */}
+          {/* Center circle - upper zone: details */}
           <circle
             cx={0} cy={0} r={CENTER_RADIUS}
             className="fill-primary/20 stroke-primary/40 cursor-pointer"
             strokeWidth={2}
             onClick={handleCenterClick}
           />
-          <text x={0} y={-8} textAnchor="middle" className="fill-foreground text-[11px] font-bold pointer-events-none">
+          <text x={0} y={zoomRoot ? -18 : -8} textAnchor="middle" className="fill-foreground text-[11px] font-bold pointer-events-none">
             {rootRow?.Item || 'Root'}
           </text>
-          <text x={0} y={8} textAnchor="middle" className="fill-muted-foreground text-[9px] pointer-events-none">
+          <text x={0} y={zoomRoot ? -4 : 8} textAnchor="middle" className="fill-muted-foreground text-[9px] pointer-events-none">
             {rootRow?.ItemDesc?.slice(0, 20) || ''}
           </text>
-          <text x={0} y={22} textAnchor="middle" className="fill-primary text-[8px] pointer-events-none">
+          <text x={0} y={zoomRoot ? 10 : 22} textAnchor="middle" className="fill-primary text-[8px] pointer-events-none">
             לחץ לפרטים
           </text>
+
+          {/* Back icon inside center circle */}
+          {zoomRoot && (
+            <g
+              onClick={(e) => { e.stopPropagation(); handleBackClick(); }}
+              className="cursor-pointer"
+            >
+              <circle cx={0} cy={32} r={16} className="fill-muted/60 hover:fill-muted" />
+              <foreignObject x={-8} y={24} width={16} height={16}>
+                <div className="flex items-center justify-center w-full h-full">
+                  <Undo2 size={12} className="text-foreground" />
+                </div>
+              </foreignObject>
+            </g>
+          )}
 
           {/* Arcs */}
           {arcs.map((arc) => {
