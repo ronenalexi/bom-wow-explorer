@@ -71,6 +71,20 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
     onRefresh();
   }, [deleteConfirm, onRefresh]);
 
+  const handleAddItem = useCallback(() => {
+    const code = newItem.item_code.trim();
+    const desc = newItem.item_desc.trim();
+    if (!code) { toast.error('Item code is required'); return; }
+    if (!desc) { toast.error('Description is required'); return; }
+    const catalog = getCatalog();
+    if (catalog.some(c => c.item_code === code)) { toast.error(`Item "${code}" already exists`); return; }
+    addCatalogItems([{ item_code: code, item_desc: desc, created_from_bom: false, source_project: '' }]);
+    toast.success(`Item "${code}" added`);
+    setNewItem({ item_code: '', item_desc: '' });
+    setAddItemOpen(false);
+    onRefresh();
+  }, [newItem, onRefresh]);
+
   if (catalog.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
