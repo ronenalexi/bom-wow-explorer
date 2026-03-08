@@ -160,6 +160,12 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                 totalQty = centralQty + locQty;
               }
 
+              // Color logic for Qty On Hand
+              const qtyColor = totalQty === 0 ? 'text-foreground'
+                : centralQty === 0 ? 'text-destructive'
+                : centralQty < totalQty ? 'text-amber-500'
+                : 'text-foreground';
+
               return (
                 <TableRow key={item.item_code}>
                   <TableCell className="font-mono font-bold text-foreground">{item.item_code}</TableCell>
@@ -173,24 +179,26 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                   <TableCell className="text-center">
                     {isSer ? (
                       <div className="space-y-1">
-                        <Badge variant="outline" className="text-xs">{centralQty} units</Badge>
+                        <Badge variant="outline" className={`text-xs ${qtyColor}`}>{centralQty} units</Badge>
                         {centralSerials.slice(0, 3).map(s => (
                           <div key={s.serial_id} className="text-xs text-muted-foreground font-mono">{s.serial_number}</div>
                         ))}
                         {centralSerials.length > 3 && <div className="text-xs text-muted-foreground">+{centralSerials.length - 3} more</div>}
                       </div>
                     ) : (
-                      <Input
-                        type="number"
-                        min={0}
-                        className="w-20 text-center mx-auto"
-                        value={centralQty}
-                        onChange={e => handleQtyChange(item.item_code, e.target.value)}
-                      />
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Input
+                          type="number"
+                          min={0}
+                          className={`w-20 text-center mx-auto ${qtyColor}`}
+                          value={centralQty}
+                          onChange={e => handleQtyChange(item.item_code, e.target.value)}
+                        />
+                      </div>
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    <span className={`text-sm font-mono font-semibold ${centralQty === 0 && totalQty > 0 ? 'text-destructive' : centralQty < totalQty ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                    <span className="text-sm font-mono font-semibold text-muted-foreground">
                       {totalQty}
                     </span>
                   </TableCell>
