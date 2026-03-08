@@ -304,6 +304,7 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         <BomGraph
           graphNodes={graphNodes}
           graphEdges={graphEdges}
+          centerNodeId={focusedNode || selectedRoot}
           onToggle={onToggle}
           onSelect={onSelect}
           onDoubleClick={onDoubleClick}
