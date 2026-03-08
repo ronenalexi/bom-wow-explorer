@@ -37,6 +37,12 @@ const GraphCtx = createContext<GraphCallbacks>({
 
 // ---------- Radial Layout ----------
 
+const NODE_WIDTH = 260;
+const NODE_HEIGHT = 140;
+const SMALL_NODE_W = 190;
+const SMALL_NODE_H = 70;
+const MIN_SPACING = 40; // minimum gap between node edges
+
 function radialLayout(
   graphNodes: GraphNode[],
   graphEdges: GraphEdge[],
@@ -44,7 +50,6 @@ function radialLayout(
 ): { nodes: Node[]; edges: Edge[] } {
   if (graphNodes.length === 0) return { nodes: [], edges: [] };
 
-  // Build adjacency from edges
   const childrenOf = new Map<string, string[]>();
   const parentOf = new Map<string, string>();
   for (const e of graphEdges) {
@@ -53,64 +58,66 @@ function radialLayout(
     parentOf.set(e.target, e.source);
   }
 
-  // Find center: use provided centerNodeId, or the node with no parent
   let centerId = centerNodeId;
   if (!centerId || !graphNodes.find(n => n.id === centerId)) {
     centerId = graphNodes.find(n => !parentOf.has(n.id))?.id || graphNodes[0].id;
   }
 
   const positions = new Map<string, { x: number; y: number }>();
-  const nodeAngles = new Map<string, number>(); // for handle direction
+  const nodeAngles = new Map<string, number>();
   const visited = new Set<string>();
 
-  // Place center
   positions.set(centerId, { x: 0, y: 0 });
   visited.add(centerId);
 
-  // Place parent of center above if it exists
+  // Place parent of center above
   const centerParent = parentOf.get(centerId);
   if (centerParent && graphNodes.find(n => n.id === centerParent)) {
-    positions.set(centerParent, { x: 0, y: -350 });
-    nodeAngles.set(centerParent, -Math.PI / 2); // above
+    positions.set(centerParent, { x: 0, y: -400 });
+    nodeAngles.set(centerParent, -Math.PI / 2);
     visited.add(centerParent);
   }
 
-  // Recursively place children in circles
+  function computeRadius(childCount: number, depth: number): number {
+    // Ensure nodes don't overlap: circumference must fit all nodes
+    const nodeSize = NODE_WIDTH + MIN_SPACING;
+    const circumferenceNeeded = childCount * nodeSize;
+    const radiusFromCircumference = circumferenceNeeded / (2 * Math.PI);
+    const minRadius = 350 + depth * 80;
+    return Math.max(minRadius, radiusFromCircumference);
+  }
+
   function placeChildren(parentId: string, depth: number) {
     const kids = childrenOf.get(parentId) || [];
     const unvisited = kids.filter(k => !visited.has(k));
     if (unvisited.length === 0) return;
 
     const parentPos = positions.get(parentId)!;
-    const radius = 300 + depth * 50; // slightly larger per depth
-    const startAngle = -Math.PI / 2; // start from top
-
-    // If this is the center node, distribute full circle
-    // If not center, distribute in an arc facing away from parent
+    const radius = computeRadius(unvisited.length, depth);
     const isCenter = parentId === centerId;
+
     let baseAngle: number;
     let spread: number;
 
     if (isCenter) {
-      // Full circle (or semi-circle if parent exists above)
       if (centerParent && graphNodes.find(n => n.id === centerParent)) {
-        // Parent is above, so spread children in lower semicircle
-        baseAngle = Math.PI / 2; // pointing down
-        spread = Math.PI * 1.5; // 270 degrees
+        baseAngle = Math.PI / 2;
+        spread = Math.PI * 1.5;
       } else {
-        baseAngle = startAngle;
+        baseAngle = -Math.PI / 2;
         spread = Math.PI * 2;
       }
     } else {
-      // Face away from the parent of this node
       const grandParent = parentOf.get(parentId);
       if (grandParent && positions.has(grandParent)) {
         const gpPos = positions.get(grandParent)!;
         baseAngle = Math.atan2(parentPos.y - gpPos.y, parentPos.x - gpPos.x);
       } else {
-        baseAngle = Math.PI / 2; // default: downward
+        baseAngle = Math.PI / 2;
       }
-      spread = Math.min(Math.PI * 0.8, unvisited.length * 0.4); // tighter arc for sub-children
+      // Dynamic spread: wider arc for more children, capped at 180 degrees
+      const minArcPerChild = 0.35;
+      spread = Math.min(Math.PI, Math.max(Math.PI * 0.5, unvisited.length * minArcPerChild));
     }
 
     for (let i = 0; i < unvisited.length; i++) {
@@ -129,25 +136,30 @@ function radialLayout(
       nodeAngles.set(kid, angle);
       visited.add(kid);
 
-      // Recurse for grandchildren
       placeChildren(kid, depth + 1);
     }
   }
 
   placeChildren(centerId, 0);
 
-  // Place any remaining unvisited nodes (shouldn't happen normally)
+  // Also place children of centerParent's other branches (siblings of center)
+  if (centerParent && graphNodes.find(n => n.id === centerParent)) {
+    placeChildren(centerParent, 1);
+  }
+
+  // Place any remaining unvisited nodes
+  let offsetX = 0;
   for (const n of graphNodes) {
     if (!positions.has(n.id)) {
-      positions.set(n.id, { x: Math.random() * 500 - 250, y: Math.random() * 500 - 250 });
+      positions.set(n.id, { x: offsetX, y: 600 });
+      offsetX += NODE_WIDTH + MIN_SPACING;
     }
   }
 
-  // Build ReactFlow nodes
   const nodes: Node[] = graphNodes.map(n => {
     const pos = positions.get(n.id)!;
-    const w = n.type === 'item' ? 260 : 190;
-    const h = n.type === 'item' ? 140 : 70;
+    const w = n.type === 'item' ? NODE_WIDTH : SMALL_NODE_W;
+    const h = n.type === 'item' ? NODE_HEIGHT : SMALL_NODE_H;
     const angle = nodeAngles.get(n.id);
 
     return {
@@ -158,7 +170,6 @@ function radialLayout(
     };
   });
 
-  // Build edges
   const edges: Edge[] = graphEdges.map(e => ({
     id: e.id,
     source: e.source,
