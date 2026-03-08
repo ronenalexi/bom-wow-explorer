@@ -197,7 +197,6 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                           </span>
                         )}
                       </div>
-                      />
                     )}
                   </TableCell>
                   <TableCell>
