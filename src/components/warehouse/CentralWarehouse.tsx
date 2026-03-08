@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   getCatalog, updateCatalogItem, getCentralQty, setCentralQty,
   getSerialsAtLocation, addSerialUnits, isItemInLocations, deleteCatalogItem,
-  type CatalogItem,
+  addCatalogItems, type CatalogItem,
 } from '@/lib/warehouse';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Search, Plus, Package, Hash, Trash2 } from 'lucide-react';
+import { Search, Plus, Package, Hash, Trash2, PlusCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { Label } from '@/components/ui/label';
 
 interface Props {
   onRefresh: () => void;
@@ -24,6 +25,8 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
   const [addSerialDialog, setAddSerialDialog] = useState<string | null>(null);
   const [serialInput, setSerialInput] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ item_code: string; inLocations: boolean } | null>(null);
+  const [addItemOpen, setAddItemOpen] = useState(false);
+  const [newItem, setNewItem] = useState({ item_code: '', item_desc: '' });
 
   const catalog = useMemo(() => getCatalog(), [refreshKey]);
 
@@ -68,6 +71,20 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
     onRefresh();
   }, [deleteConfirm, onRefresh]);
 
+  const handleAddItem = useCallback(() => {
+    const code = newItem.item_code.trim();
+    const desc = newItem.item_desc.trim();
+    if (!code) { toast.error('Item code is required'); return; }
+    if (!desc) { toast.error('Description is required'); return; }
+    const catalog = getCatalog();
+    if (catalog.some(c => c.item_code === code)) { toast.error(`Item "${code}" already exists`); return; }
+    addCatalogItems([{ item_code: code, item_desc: desc, created_from_bom: false, source_project: '' }]);
+    toast.success(`Item "${code}" added`);
+    setNewItem({ item_code: '', item_desc: '' });
+    setAddItemOpen(false);
+    onRefresh();
+  }, [newItem, onRefresh]);
+
   if (catalog.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
@@ -108,6 +125,9 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
           <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search items..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8" />
         </div>
+        <Button size="sm" className="gap-1.5" onClick={() => setAddItemOpen(true)}>
+          <PlusCircle className="w-4 h-4" /> Add Item
+        </Button>
       </div>
 
       <div className="flex-1 overflow-auto p-4">
@@ -225,6 +245,31 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Add Item Dialog */}
+      <Dialog open={addItemOpen} onOpenChange={(open) => { setAddItemOpen(open); if (!open) setNewItem({ item_code: '', item_desc: '' }); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="w-4 h-4" /> Add New Item
+            </DialogTitle>
+            <DialogDescription>Add a new item manually to the catalog.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-item-code">Item Code</Label>
+              <Input id="new-item-code" placeholder="e.g. CABLE-HDMI-2M" value={newItem.item_code} onChange={e => setNewItem(p => ({ ...p, item_code: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-item-desc">Description</Label>
+              <Input id="new-item-desc" placeholder="e.g. HDMI Cable 2 meters" value={newItem.item_desc} onChange={e => setNewItem(p => ({ ...p, item_desc: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddItemOpen(false); setNewItem({ item_code: '', item_desc: '' }); }}>Cancel</Button>
+            <Button onClick={handleAddItem}>Add Item</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
