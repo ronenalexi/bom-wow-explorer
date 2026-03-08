@@ -66,7 +66,8 @@ function layoutNodes(graphNodes: GraphNode[], graphEdges: GraphEdge[]): { nodes:
     source: e.source,
     target: e.target,
     animated: true,
-    style: { stroke: 'hsl(185 80% 40% / 0.6)', strokeWidth: 2 },
+    type: 'smoothstep',
+    style: { stroke: 'hsl(185 80% 40% / 0.5)', strokeWidth: 2 },
   }));
 
   return { nodes, edges };
