@@ -376,9 +376,9 @@ function BomGraphInner({ graphNodes, graphEdges, centerNodeId, callbacks }: BomG
           nodeColor={(n) => {
             if (n.type === 'more') return 'hsl(38 95% 55%)';
             if (n.type === 'children-group') return 'hsl(185 100% 48%)';
-            return 'hsl(222 20% 25%)';
+            return isDark ? 'hsl(222 20% 25%)' : 'hsl(210 15% 70%)';
           }}
-          maskColor="hsl(222 25% 6% / 0.8)"
+          maskColor={isDark ? "hsl(222 25% 6% / 0.8)" : "hsl(210 20% 96% / 0.8)"}
         />
       </ReactFlow>
     </GraphCtx.Provider>
