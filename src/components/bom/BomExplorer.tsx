@@ -219,69 +219,210 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
   const browserParentRow = tree && browserParent ? tree.rowBySeq.get(browserParent) || null : null;
   const browserChildren = tree && browserParent ? tree.childrenMap.get(browserParent) || [] : [];
 
+  // CSV preview dialog — rendered always so it works before tree exists
+  const csvDialog = (
+    <Dialog
+      open={previewOpen}
+      onOpenChange={(open) => {
+        setPreviewOpen(open);
+        if (!open) {
+          setPreviewRaw(null);
+          setColumnMapping({});
+        }
+      }}
+    >
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Map CSV Columns</DialogTitle>
+          <DialogDescription>
+            Match your CSV headers to BOM fields. At minimum, map the "Item" field.
+          </DialogDescription>
+        </DialogHeader>
+
+        {previewRaw && (
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+              {previewRaw.filename && (
+                <span className="max-w-[220px] truncate" title={previewRaw.filename}>
+                  File: <span className="font-mono text-foreground">{previewRaw.filename}</span>
+                </span>
+              )}
+              <span>{previewRaw.rawRows.length} data rows</span>
+              <span>• {previewRaw.headers.length} columns</span>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+              {BOM_FIELDS.map(field => (
+                <div key={field} className="space-y-1">
+                  <label className="text-xs font-medium text-foreground">
+                    {field}
+                    {field === 'Item' && <span className="text-destructive ml-0.5">*</span>}
+                  </label>
+                  <Select
+                    value={columnMapping[field] || '__none__'}
+                    onValueChange={(val) => {
+                      setColumnMapping(prev => {
+                        const next = { ...prev };
+                        if (val === '__none__') {
+                          delete next[field];
+                        } else {
+                          next[field] = val;
+                        }
+                        return next;
+                      });
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue placeholder="— skip —" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">— skip —</SelectItem>
+                      {previewRaw.headers.map(h => (
+                        <SelectItem key={h} value={h}>{h}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+
+            {!mappingHasItem && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                <p className="font-medium">Map at least the "Item" column to continue.</p>
+              </div>
+            )}
+
+            <div className="border rounded-md max-h-48 overflow-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-16 text-xs">Seq</TableHead>
+                    <TableHead className="w-16 text-xs">Level</TableHead>
+                    <TableHead className="text-xs">Item</TableHead>
+                    <TableHead className="text-xs">Description</TableHead>
+                    <TableHead className="text-xs">Parent</TableHead>
+                    <TableHead className="text-xs">Qty</TableHead>
+                    <TableHead className="text-xs">Path</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {previewMappedRows.map((row, i) => (
+                    <TableRow key={i}>
+                      <TableCell className="font-mono text-xs">{row.Seq}</TableCell>
+                      <TableCell className="text-xs">{row.Level}</TableCell>
+                      <TableCell className="font-mono text-xs">{row.Item}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">{row.ItemDesc}</TableCell>
+                      <TableCell className="font-mono text-xs">{row.Parent}</TableCell>
+                      <TableCell className="text-xs">{row.QtyPerParent}</TableCell>
+                      <TableCell className="text-[10px] text-muted-foreground">{row.Path}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Live preview of first 8 rows with current mapping. Adjust dropdowns above if data looks wrong.
+            </p>
+          </div>
+        )}
+
+        <DialogFooter>
+          <Button
+            variant="outline"
+            type="button"
+            onClick={() => {
+              setPreviewOpen(false);
+              setPreviewRaw(null);
+              setColumnMapping({});
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={!previewRaw || !mappingHasItem}
+            onClick={() => {
+              if (!previewRaw) return;
+              const rows = mapRows(previewRaw.rawRows, columnMapping);
+              buildFromRows(rows, { filename: previewRaw.filename });
+              setPreviewOpen(false);
+              setPreviewRaw(null);
+              setColumnMapping({});
+            }}
+          >
+            Use this file
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
   // Upload screen
   if (!tree) {
     return (
-      <div
-        className="flex min-h-screen items-center justify-center p-8"
-        onDragOver={e => e.preventDefault()}
-        onDrop={handleDrop}
-      >
-        <div className="text-center max-w-xl space-y-6">
-          <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4 animate-float">
-            <Zap className="w-10 h-10 text-primary" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">BOM WOW Explorer</h1>
-            <p className="text-muted-foreground">
-              Visualize your Bill of Materials as an interactive graph and connect it to your Warehouse.
-            </p>
-          </div>
-
-          <div className="bg-muted/40 border border-border rounded-xl p-4 text-left">
-            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
-              What can you do here?
-            </p>
-            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
-              <li>Upload a BOM CSV exported from your ERP.</li>
-              <li>Explore the structure as an interactive graph or table.</li>
-              <li>Select items and send them to the Warehouse catalog.</li>
-            </ul>
-          </div>
-
-          <div className="space-y-3">
-            <div
-              className="border-2 border-dashed border-border rounded-xl p-8 hover:border-primary/50 transition-colors cursor-pointer"
-              onClick={() => fileRef.current?.click()}
-            >
-              <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">
-                Drop CSV here or <span className="text-primary">click to browse</span>
-              </p>
-              <p className="text-xs text-muted-foreground/70 mt-2">
-                Expected columns (case-insensitive): Seq, Level, Item, ItemDesc, Parent, ParentDesc, QtyPerParent, CumQty, Path, HasChildren
+      <>
+        <div
+          className="flex min-h-screen items-center justify-center p-8"
+          onDragOver={e => e.preventDefault()}
+          onDrop={handleDrop}
+        >
+          <div className="text-center max-w-xl space-y-6">
+            <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4 animate-float">
+              <Zap className="w-10 h-10 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground mb-2">BOM WOW Explorer</h1>
+              <p className="text-muted-foreground">
+                Visualize your Bill of Materials as an interactive graph and connect it to your Warehouse.
               </p>
             </div>
-            <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
-            <Button
-              variant="outline"
-              className="w-full border-primary/30 text-primary hover:bg-primary/10"
-              onClick={() => loadCSV(DEMO_CSV, { filename: 'Demo: Mountain Bike BOM' })}
-            >
-              <FileSpreadsheet className="w-4 h-4 mr-2" />
-              Load Demo Data (Mountain Bike BOM)
-            </Button>
-          </div>
 
-          <div className="bg-card/60 border border-dashed border-primary/30 rounded-lg p-3 text-left text-xs text-muted-foreground">
-            <p className="font-medium text-foreground mb-1">Demo tips</p>
-            <p>
-              The demo BOM is a complete Mountain Bike assembly. Use it to try the graph, focus mode, search
-              and the &quot;Select for Warehouse&quot; flow before connecting your own data.
-            </p>
+            <div className="bg-muted/40 border border-border rounded-xl p-4 text-left">
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                What can you do here?
+              </p>
+              <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Upload a BOM CSV exported from your ERP.</li>
+                <li>Explore the structure as an interactive graph or table.</li>
+                <li>Select items and send them to the Warehouse catalog.</li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <div
+                className="border-2 border-dashed border-border rounded-xl p-8 hover:border-primary/50 transition-colors cursor-pointer"
+                onClick={() => fileRef.current?.click()}
+              >
+                <Upload className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+                <p className="text-sm text-muted-foreground">
+                  Drop CSV here or <span className="text-primary">click to browse</span>
+                </p>
+                <p className="text-xs text-muted-foreground/70 mt-2">
+                  Expected columns (case-insensitive): Seq, Level, Item, ItemDesc, Parent, ParentDesc, QtyPerParent, CumQty, Path, HasChildren
+                </p>
+              </div>
+              <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
+              <Button
+                variant="outline"
+                className="w-full border-primary/30 text-primary hover:bg-primary/10"
+                onClick={() => loadCSV(DEMO_CSV, { filename: 'Demo: Mountain Bike BOM' })}
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                Load Demo Data (Mountain Bike BOM)
+              </Button>
+            </div>
+
+            <div className="bg-card/60 border border-dashed border-primary/30 rounded-lg p-3 text-left text-xs text-muted-foreground">
+              <p className="font-medium text-foreground mb-1">Demo tips</p>
+              <p>
+                The demo BOM is a complete Mountain Bike assembly. Use it to try the graph, focus mode, search
+                and the &quot;Select for Warehouse&quot; flow before connecting your own data.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+        {csvDialog}
+      </>
     );
   }
 
@@ -414,143 +555,7 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         onSelect={onSearchSelect}
       />
 
-      {/* CSV preview dialog with column mapping */}
-      <Dialog
-        open={previewOpen}
-        onOpenChange={(open) => {
-          setPreviewOpen(open);
-          if (!open) {
-            setPreviewRaw(null);
-            setColumnMapping({});
-          }
-        }}
-      >
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Map CSV Columns</DialogTitle>
-            <DialogDescription>
-              Match your CSV headers to BOM fields. At minimum, map the "Item" field.
-            </DialogDescription>
-          </DialogHeader>
-
-          {previewRaw && (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                {previewRaw.filename && (
-                  <span className="max-w-[220px] truncate" title={previewRaw.filename}>
-                    File: <span className="font-mono text-foreground">{previewRaw.filename}</span>
-                  </span>
-                )}
-                <span>{previewRaw.rawRows.length} data rows</span>
-                <span>• {previewRaw.headers.length} columns</span>
-              </div>
-
-              {/* Column mapping grid */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                {BOM_FIELDS.map(field => (
-                  <div key={field} className="space-y-1">
-                    <label className="text-xs font-medium text-foreground">
-                      {field}
-                      {field === 'Item' && <span className="text-destructive ml-0.5">*</span>}
-                    </label>
-                    <Select
-                      value={columnMapping[field] || '__none__'}
-                      onValueChange={(val) => {
-                        setColumnMapping(prev => {
-                          const next = { ...prev };
-                          if (val === '__none__') {
-                            delete next[field];
-                          } else {
-                            next[field] = val;
-                          }
-                          return next;
-                        });
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="— skip —" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">— skip —</SelectItem>
-                        {previewRaw.headers.map(h => (
-                          <SelectItem key={h} value={h}>{h}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
-              </div>
-
-              {!mappingHasItem && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
-                  <p className="font-medium">Map at least the "Item" column to continue.</p>
-                </div>
-              )}
-
-              {/* Live preview table */}
-              <div className="border rounded-md max-h-48 overflow-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-16 text-xs">Seq</TableHead>
-                      <TableHead className="w-16 text-xs">Level</TableHead>
-                      <TableHead className="text-xs">Item</TableHead>
-                      <TableHead className="text-xs">Description</TableHead>
-                      <TableHead className="text-xs">Parent</TableHead>
-                      <TableHead className="text-xs">Qty</TableHead>
-                      <TableHead className="text-xs">Path</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {previewMappedRows.map((row, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-mono text-xs">{row.Seq}</TableCell>
-                        <TableCell className="text-xs">{row.Level}</TableCell>
-                        <TableCell className="font-mono text-xs">{row.Item}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{row.ItemDesc}</TableCell>
-                        <TableCell className="font-mono text-xs">{row.Parent}</TableCell>
-                        <TableCell className="text-xs">{row.QtyPerParent}</TableCell>
-                        <TableCell className="text-[10px] text-muted-foreground">{row.Path}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Live preview of first 8 rows with current mapping. Adjust dropdowns above if data looks wrong.
-              </p>
-            </div>
-          )}
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              type="button"
-              onClick={() => {
-                setPreviewOpen(false);
-                setPreviewRaw(null);
-                setColumnMapping({});
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              disabled={!previewRaw || !mappingHasItem}
-              onClick={() => {
-                if (!previewRaw) return;
-                const rows = mapRows(previewRaw.rawRows, columnMapping);
-                buildFromRows(rows, { filename: previewRaw.filename });
-                setPreviewOpen(false);
-                setPreviewRaw(null);
-                setColumnMapping({});
-              }}
-            >
-              Use this file
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {csvDialog}
     </div>
   );
 }
