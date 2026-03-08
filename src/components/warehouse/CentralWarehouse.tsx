@@ -1,15 +1,17 @@
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   getCatalog, updateCatalogItem, getCentralQty, setCentralQty,
-  getSerialsAtLocation, addSerialUnits, type CatalogItem,
+  getSerialsAtLocation, addSerialUnits, isItemInLocations, deleteCatalogItem,
+  type CatalogItem,
 } from '@/lib/warehouse';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Search, Plus, Package, Hash } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Search, Plus, Package, Hash, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -21,6 +23,7 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
   const [search, setSearch] = useState('');
   const [addSerialDialog, setAddSerialDialog] = useState<string | null>(null);
   const [serialInput, setSerialInput] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ item_code: string; inLocations: boolean } | null>(null);
 
   const catalog = useMemo(() => getCatalog(), [refreshKey]);
 
@@ -51,6 +54,19 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
     setSerialInput('');
     onRefresh();
   }, [addSerialDialog, serialInput, onRefresh]);
+
+  const handleDeleteClick = useCallback((item_code: string) => {
+    const inLocations = isItemInLocations(item_code);
+    setDeleteConfirm({ item_code, inLocations });
+  }, []);
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (!deleteConfirm) return;
+    deleteCatalogItem(deleteConfirm.item_code);
+    toast.success(`Item ${deleteConfirm.item_code} deleted`);
+    setDeleteConfirm(null);
+    onRefresh();
+  }, [deleteConfirm, onRefresh]);
 
   if (catalog.length === 0) {
     return (
@@ -149,11 +165,16 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {isSer && (
-                      <Button size="sm" variant="outline" onClick={() => setAddSerialDialog(item.item_code)} className="gap-1">
-                        <Plus className="w-3 h-3" /> Add S/N
+                    <div className="flex items-center gap-1">
+                      {isSer && (
+                        <Button size="sm" variant="outline" onClick={() => setAddSerialDialog(item.item_code)} className="gap-1">
+                          <Plus className="w-3 h-3" /> Add S/N
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClick(item.item_code)}>
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-                    )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -184,6 +205,26 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm?.inLocations
+                ? `⚠️ Item "${deleteConfirm.item_code}" is currently assigned to one or more locations. Deleting it will remove it from all locations as well. Are you sure?`
+                : `Are you sure you want to delete "${deleteConfirm?.item_code}" from the catalog?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
