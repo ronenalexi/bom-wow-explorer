@@ -474,6 +474,21 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
 
         <div className="flex-1" />
 
+        {/* View mode toggle */}
+        <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)} size="sm" className="bg-muted/50 rounded-md p-0.5">
+          <ToggleGroupItem value="graph" aria-label="Graph view" className="px-2 py-1 text-xs gap-1 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+            <Share2 className="w-3.5 h-3.5" /> Graph
+          </ToggleGroupItem>
+          <ToggleGroupItem value="sunburst" aria-label="Sunburst view" className="px-2 py-1 text-xs gap-1 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+            <Sun className="w-3.5 h-3.5" /> Sunburst
+          </ToggleGroupItem>
+          <ToggleGroupItem value="table" aria-label="Table view" className="px-2 py-1 text-xs gap-1 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+            <List className="w-3.5 h-3.5" /> Table
+          </ToggleGroupItem>
+        </ToggleGroup>
+
+        <div className="w-px h-6 bg-border" />
+
         {/* Select mode for warehouse */}
         <Button
           size="sm"
