@@ -37,7 +37,6 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
     return Array.from(cats).sort();
   }, [catalog]);
 
-  const catalog = useMemo(() => getCatalog(), [refreshKey]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
