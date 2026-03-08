@@ -29,7 +29,16 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
   const [previewRaw, setPreviewRaw] = useState<{ headers: string[]; rawRows: Record<string, string>[]; filename?: string } | null>(null);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [fileInfo, setFileInfo] = useState<{ name: string; rowCount: number; loadedAt: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Derived: preview rows based on current mapping
+  const previewMappedRows = useMemo(() => {
+    if (!previewRaw) return [];
+    return mapRows(previewRaw.rawRows.slice(0, 8), columnMapping);
+  }, [previewRaw, columnMapping]);
+
+  const mappingHasItem = !!columnMapping.Item;
 
   // Build tree from parsed rows
   const buildFromRows = useCallback((rows: BomRow[], meta?: { filename?: string }) => {
@@ -64,30 +73,17 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
     }
   }, [buildFromRows]);
 
-  // Parse and open preview dialog (used for user-uploaded files)
+  // Parse and open preview dialog with column mapping
   const openPreview = useCallback((text: string, filename?: string) => {
     try {
-      const rows = parseCSV(text);
-      if (rows.length === 0) {
+      const { headers, rawRows } = parseCSVRaw(text);
+      if (rawRows.length === 0) {
         toast.error('No data found in CSV');
         return;
       }
-
-      const issues: string[] = [];
-      const hasItem = rows.some(r => r.Item);
-      const hasItemDesc = rows.some(r => r.ItemDesc);
-      const hasLevel = rows.some(r => typeof r.Level === 'number' && !Number.isNaN(r.Level));
-      const hasParent = rows.some(r => r.Parent);
-      const hasPath = rows.some(r => r.Path);
-
-      if (!hasItem) issues.push('Item');
-      if (!hasItemDesc) issues.push('ItemDesc');
-      if (!hasLevel) issues.push('Level');
-      if (!hasParent) issues.push('Parent');
-      if (!hasPath) issues.push('Path');
-
-      setPreviewIssues(issues);
-      setPreviewData({ rows, filename });
+      const autoMapping = autoMatchHeaders(headers);
+      setColumnMapping(autoMapping);
+      setPreviewRaw({ headers, rawRows, filename });
       setPreviewOpen(true);
     } catch (e: any) {
       toast.error('Failed to parse CSV: ' + e.message);
