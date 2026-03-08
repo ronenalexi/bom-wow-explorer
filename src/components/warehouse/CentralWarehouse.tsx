@@ -41,8 +41,10 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return catalog.filter(c => c.item_code.toLowerCase().includes(q) || c.item_desc.toLowerCase().includes(q));
-  }, [catalog, search]);
+    return catalog
+      .filter(c => c.item_code.toLowerCase().includes(q) || c.item_desc.toLowerCase().includes(q))
+      .filter(c => categoryFilter === 'all' || c.category === categoryFilter);
+  }, [catalog, search, categoryFilter]);
 
   const handleQtyChange = useCallback((item_code: string, val: string) => {
     const qty = Math.max(0, parseInt(val) || 0);
