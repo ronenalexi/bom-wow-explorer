@@ -196,7 +196,7 @@ export function transferBulkToLocation(item_code: string, qty: number, location_
   return true;
 }
 
-export function returnBulkFromLocation(item_code: string, qty: number, location_id: string) {
+export function returnBulkFromLocation(item_code: string, qty: number, location_id: string, locationName?: string) {
   const inv = getLocationInventory();
   const idx = inv.findIndex(e => e.location_id === location_id && e.item_code === item_code);
   if (idx < 0) return;
@@ -205,6 +205,9 @@ export function returnBulkFromLocation(item_code: string, qty: number, location_
   if (inv[idx].qty <= 0) inv.splice(idx, 1);
   saveLocationInventory(inv);
   setCentralQty(item_code, getCentralQty(item_code) + actual);
+  import('./warehouseHistory').then(({ addTransferLogEntry }) => {
+    addTransferLogEntry({ item_code, qty: actual, from: locationName || location_id, to: 'Central', type: 'bulk' });
+  });
 }
 
 export function returnAllFromLocation(location_id: string): { bulkItems: number; bulkQty: number; serialCount: number } {
