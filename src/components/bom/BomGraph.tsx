@@ -366,7 +366,7 @@ function BomGraphInner({ graphNodes, graphEdges, centerNodeId, callbacks }: BomG
         defaultEdgeOptions={{ animated: false }}
         connectionLineType={ConnectionLineType.SmoothStep}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(222 15% 15%)" />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={isDark ? "hsl(222 15% 15%)" : "hsl(210 15% 80%)"} />
         <Controls>
           <ControlButton onClick={toggleTheme} title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
