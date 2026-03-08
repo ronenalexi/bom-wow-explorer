@@ -165,11 +165,16 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                     )}
                   </TableCell>
                   <TableCell>
-                    {isSer && (
-                      <Button size="sm" variant="outline" onClick={() => setAddSerialDialog(item.item_code)} className="gap-1">
-                        <Plus className="w-3 h-3" /> Add S/N
+                    <div className="flex items-center gap-1">
+                      {isSer && (
+                        <Button size="sm" variant="outline" onClick={() => setAddSerialDialog(item.item_code)} className="gap-1">
+                          <Plus className="w-3 h-3" /> Add S/N
+                        </Button>
+                      )}
+                      <Button size="icon" variant="ghost" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteClick(item.item_code)}>
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-                    )}
+                    </div>
                   </TableCell>
                 </TableRow>
               );
