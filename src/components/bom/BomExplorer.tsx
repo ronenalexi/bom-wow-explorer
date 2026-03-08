@@ -538,17 +538,35 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         </div>
       )}
 
-      {/* Graph */}
-      <div className="flex-1">
-        <BomGraph
-          graphNodes={graphNodes}
-          graphEdges={graphEdges}
-          centerNodeId={focusedNode || selectedRoot}
-          onToggle={onToggle}
-          onSelect={onSelect}
-          onDoubleClick={onDoubleClick}
-          onOpenBrowser={onOpenBrowser}
-        />
+      {/* View content */}
+      <div className="flex-1 overflow-hidden">
+        {viewMode === 'graph' && (
+          <BomGraph
+            graphNodes={graphNodes}
+            graphEdges={graphEdges}
+            centerNodeId={focusedNode || selectedRoot}
+            onToggle={onToggle}
+            onSelect={onSelect}
+            onDoubleClick={onDoubleClick}
+            onOpenBrowser={onOpenBrowser}
+          />
+        )}
+        {viewMode === 'sunburst' && (
+          <BomSunburst
+            tree={tree}
+            rootSeq={selectedRoot}
+            onSelect={onSelect}
+            selectedNode={selectedNode}
+          />
+        )}
+        {viewMode === 'table' && (
+          <BomTreeTable
+            tree={tree}
+            rootSeq={selectedRoot}
+            onSelect={onSelect}
+            selectedNode={selectedNode}
+          />
+        )}
       </div>
 
       {/* Panels */}
