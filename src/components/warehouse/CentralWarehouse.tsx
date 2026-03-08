@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   getCatalog, updateCatalogItem, getCentralQty, setCentralQty,
   getSerialsAtLocation, addSerialUnits, isItemInLocations, deleteCatalogItem,
-  addCatalogItems, type CatalogItem,
+  addCatalogItems, getLocationInventory, getSerials, type CatalogItem,
 } from '@/lib/warehouse';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -148,6 +148,17 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
               const centralSerials = isSer ? getSerialsAtLocation(item.item_code, 'CENTRAL') : [];
               const centralQty = isSer ? centralSerials.length : getCentralQty(item.item_code);
 
+              // Calculate total across all locations
+              let totalQty: number;
+              if (isSer) {
+                totalQty = getSerials().filter(u => u.item_code === item.item_code).length;
+              } else {
+                const locQty = getLocationInventory()
+                  .filter(e => e.item_code === item.item_code)
+                  .reduce((sum, e) => sum + e.qty, 0);
+                totalQty = centralQty + locQty;
+              }
+
               return (
                 <TableRow key={item.item_code}>
                   <TableCell className="font-mono font-bold text-foreground">{item.item_code}</TableCell>
@@ -161,20 +172,31 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                   <TableCell className="text-center">
                     {isSer ? (
                       <div className="space-y-1">
-                        <Badge variant="outline" className="text-xs">{centralQty} units</Badge>
+                        <Badge variant="outline" className="text-xs">
+                          <span className={centralQty === 0 && totalQty > 0 ? 'text-destructive' : centralQty < totalQty ? 'text-amber-500' : 'text-foreground'}>
+                            {centralQty}/{totalQty}
+                          </span>
+                        </Badge>
                         {centralSerials.slice(0, 3).map(s => (
                           <div key={s.serial_id} className="text-xs text-muted-foreground font-mono">{s.serial_number}</div>
                         ))}
                         {centralSerials.length > 3 && <div className="text-xs text-muted-foreground">+{centralSerials.length - 3} more</div>}
                       </div>
                     ) : (
-                      <Input
-                        type="number"
-                        min={0}
-                        className="w-20 text-center mx-auto"
-                        value={centralQty}
-                        onChange={e => handleQtyChange(item.item_code, e.target.value)}
-                      />
+                      <div className="flex items-center justify-center gap-2">
+                        <Input
+                          type="number"
+                          min={0}
+                          className="w-20 text-center"
+                          value={centralQty}
+                          onChange={e => handleQtyChange(item.item_code, e.target.value)}
+                        />
+                        {totalQty > 0 && (
+                          <span className={`text-xs font-mono ${centralQty === 0 && totalQty > 0 ? 'text-destructive' : centralQty < totalQty ? 'text-amber-500' : 'text-muted-foreground'}`}>
+                            {centralQty}/{totalQty}
+                          </span>
+                        )}
+                      </div>
                     )}
                   </TableCell>
                   <TableCell>
