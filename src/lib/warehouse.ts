@@ -180,7 +180,7 @@ export function getLocationQty(location_id: string, item_code: string): number {
 }
 
 // ── Transfers ──
-export function transferBulkToLocation(item_code: string, qty: number, location_id: string): boolean {
+export function transferBulkToLocation(item_code: string, qty: number, location_id: string, locationName?: string): boolean {
   const centralQty = getCentralQty(item_code);
   if (qty > centralQty) return false;
   setCentralQty(item_code, centralQty - qty);
@@ -189,6 +189,10 @@ export function transferBulkToLocation(item_code: string, qty: number, location_
   if (idx >= 0) inv[idx].qty += qty;
   else inv.push({ location_id, item_code, qty });
   saveLocationInventory(inv);
+  // Log transfer
+  import('./warehouseHistory').then(({ addTransferLogEntry }) => {
+    addTransferLogEntry({ item_code, qty, from: 'Central', to: locationName || location_id, type: 'bulk' });
+  });
   return true;
 }
 
