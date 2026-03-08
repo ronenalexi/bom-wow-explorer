@@ -131,6 +131,18 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
         <h2 className="font-bold text-foreground text-lg">Central Warehouse</h2>
         <Badge variant="secondary">{catalog.length} items</Badge>
         <div className="flex-1" />
+        {categories.length > 0 && (
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-36 h-9">
+              <Tag className="w-3.5 h-3.5 mr-1.5" />
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search items..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8" />
