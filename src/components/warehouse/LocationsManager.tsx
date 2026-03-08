@@ -31,8 +31,15 @@ export default function LocationsManager({ onRefresh, refreshKey }: Props) {
   const [confirmReturnId, setConfirmReturnId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [transferDialogLocId, setTransferDialogLocId] = useState<string | null>(null);
+  const [locSearch, setLocSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const locations = useMemo(() => getLocations(), [refreshKey]);
+  const filteredLocations = useMemo(() => {
+    return locations
+      .filter(l => typeFilter === 'all' || l.type === typeFilter)
+      .filter(l => !locSearch || l.name.toLowerCase().includes(locSearch.toLowerCase()) || l.notes.toLowerCase().includes(locSearch.toLowerCase()));
+  }, [locations, locSearch, typeFilter]);
   const selectedLocation = locations.find(l => l.location_id === selectedLocationId);
 
   const handleAddLocation = useCallback(() => {
