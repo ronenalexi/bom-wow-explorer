@@ -82,7 +82,38 @@ export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate
             ))}
           </div>
 
-          {/* Direct Children List */}
+          {/* Add to Warehouse */}
+          {row && (() => {
+            const alreadyInCatalog = getCatalog().some(c => c.item_code === row.Item);
+            return (
+              <div className="mt-5">
+                <Separator className="bg-border mb-4" />
+                <Button
+                  size="sm"
+                  variant={alreadyInCatalog ? 'outline' : 'default'}
+                  disabled={alreadyInCatalog}
+                  className="w-full gap-2"
+                  onClick={() => {
+                    const added = addCatalogItems([{
+                      item_code: row.Item,
+                      item_desc: row.ItemDesc,
+                      created_from_bom: true,
+                      source_project: tree?.roots[0]?.Item || '',
+                    }]);
+                    if (added > 0) {
+                      toast.success(`"${row.Item}" added to Central Warehouse`);
+                      onWarehouseRefresh?.();
+                    } else {
+                      toast.info(`"${row.Item}" already exists in catalog`);
+                    }
+                  }}
+                >
+                  <PackagePlus className="w-4 h-4" />
+                  {alreadyInCatalog ? 'Already in Warehouse' : 'Add to Central Warehouse'}
+                </Button>
+              </div>
+            );
+          })()}
           {row.HasChildren && selectedSeq && tree && (() => {
             const directChildren = tree.childrenMap.get(selectedSeq) || [];
             return directChildren.length > 0 ? (
