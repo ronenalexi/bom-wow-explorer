@@ -50,6 +50,7 @@ export function autoMatchHeaders(headers: string[]): ColumnMapping {
   const mapping: ColumnMapping = {};
   const usedHeaders = new Set<string>();
 
+  // Pass 1: Exact alias match
   for (const field of BOM_FIELDS) {
     const aliases = FIELD_ALIASES[field];
     for (const header of headers) {
@@ -62,6 +63,26 @@ export function autoMatchHeaders(headers: string[]): ColumnMapping {
       }
     }
   }
+
+  // Pass 2: Partial/contains match for unmatched fields
+  for (const field of BOM_FIELDS) {
+    if (mapping[field]) continue;
+    const aliases = FIELD_ALIASES[field];
+    for (const header of headers) {
+      if (usedHeaders.has(header)) continue;
+      const normalized = header.toLowerCase().trim();
+      // Check if any alias is contained in the header or vice versa
+      const matched = aliases.some(alias =>
+        normalized.includes(alias) || alias.includes(normalized)
+      );
+      if (matched) {
+        mapping[field] = header;
+        usedHeaders.add(header);
+        break;
+      }
+    }
+  }
+
   return mapping;
 }
 
