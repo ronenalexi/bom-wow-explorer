@@ -10,7 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { ChevronRight, Search, ArrowUpDown, Leaf, FolderTree, X, PackagePlus } from 'lucide-react';
 import type { BomRow, TreeData } from '@/lib/bom';
 import { getAncestors } from '@/lib/bom';
-import { addCatalogItems, getCatalog } from '@/lib/warehouse';
+import { addCatalogItems, getCatalog, setCentralQty, getCentralQty } from '@/lib/warehouse';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 // --- Side Panel ---
@@ -25,6 +26,8 @@ interface SidePanelProps {
 }
 
 export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate, onWarehouseRefresh }: SidePanelProps) {
+  const [qtyDialogOpen, setQtyDialogOpen] = useState(false);
+  const [addQty, setAddQty] = useState('0');
   const ancestors = useMemo(() => {
     if (!selectedSeq || !tree) return [];
     return getAncestors(tree, selectedSeq);
@@ -94,23 +97,71 @@ export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate
                   disabled={alreadyInCatalog}
                   className="w-full gap-2"
                   onClick={() => {
-                    const added = addCatalogItems([{
-                      item_code: row.Item,
-                      item_desc: row.ItemDesc,
-                      created_from_bom: true,
-                      source_project: tree?.roots[0]?.Item || '',
-                    }]);
-                    if (added > 0) {
-                      toast.success(`"${row.Item}" added to Central Warehouse`);
-                      onWarehouseRefresh?.();
-                    } else {
-                      toast.info(`"${row.Item}" already exists in catalog`);
-                    }
+                    setAddQty('0');
+                    setQtyDialogOpen(true);
                   }}
                 >
                   <PackagePlus className="w-4 h-4" />
                   {alreadyInCatalog ? 'Already in Warehouse' : 'Add to Central Warehouse'}
                 </Button>
+
+                {/* Qty Dialog */}
+                <Dialog open={qtyDialogOpen} onOpenChange={setQtyDialogOpen}>
+                  <DialogContent className="max-w-sm bg-card border-border">
+                    <DialogHeader>
+                      <DialogTitle className="text-primary font-mono text-base">
+                        Add "{row.Item}" to Warehouse
+                      </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">
+                      Enter initial quantity (leave 0 to add to catalog only).
+                    </p>
+                    <div className="space-y-2 mt-2">
+                      <Label htmlFor="add-qty" className="text-xs text-muted-foreground">Initial Qty On Hand</Label>
+                      <Input
+                        id="add-qty"
+                        type="number"
+                        min={0}
+                        value={addQty}
+                        onChange={e => setAddQty(e.target.value)}
+                        className="bg-secondary/50 font-mono"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex justify-end gap-2 mt-4">
+                      <Button size="sm" variant="outline" onClick={() => setQtyDialogOpen(false)}>
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const qty = Math.max(0, parseInt(addQty) || 0);
+                          const added = addCatalogItems([{
+                            item_code: row.Item,
+                            item_desc: row.ItemDesc,
+                            created_from_bom: true,
+                            source_project: tree?.roots[0]?.Item || '',
+                          }]);
+                          if (added > 0 && qty > 0) {
+                            setCentralQty(row.Item, getCentralQty(row.Item) + qty);
+                          }
+                          setQtyDialogOpen(false);
+                          if (added > 0) {
+                            toast.success(qty > 0
+                              ? `"${row.Item}" added with ${qty} units`
+                              : `"${row.Item}" added to catalog`
+                            );
+                            onWarehouseRefresh?.();
+                          } else {
+                            toast.info(`"${row.Item}" already exists in catalog`);
+                          }
+                        }}
+                      >
+                        Add to Warehouse
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
               </div>
             );
           })()}
