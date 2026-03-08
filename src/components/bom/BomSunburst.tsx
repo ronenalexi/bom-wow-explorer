@@ -1,4 +1,5 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useRef } from 'react';
+import { Undo2 } from 'lucide-react';
 import type { TreeData } from '@/lib/bom';
 
 interface Props {
@@ -39,7 +40,6 @@ function polarToCartesian(cx: number, cy: number, r: number, angle: number) {
 function arcPath(cx: number, cy: number, innerR: number, outerR: number, startAngle: number, endAngle: number) {
   const sweep = endAngle - startAngle;
   if (sweep >= 359.99) {
-    // Full circle — draw two half-arcs
     const mid = startAngle + 180;
     return [
       arcPath(cx, cy, innerR, outerR, startAngle, mid),
@@ -67,6 +67,13 @@ const MAX_DEPTH = 5;
 export default function BomSunburst({ tree, rootSeq, onSelect, selectedNode }: Props) {
   const [zoomRoot, setZoomRoot] = useState<string | null>(null);
   const [hoveredSeq, setHoveredSeq] = useState<string | null>(null);
+
+  // Zoom & pan state
+  const [scale, setScale] = useState(1);
+  const [panX, setPanX] = useState(0);
+  const [panY, setPanY] = useState(0);
+  const isPanning = useRef(false);
+  const panStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
   const effectiveRoot = zoomRoot || rootSeq;
 
@@ -117,83 +124,136 @@ export default function BomSunburst({ tree, rootSeq, onSelect, selectedNode }: P
   const maxR = CENTER_RADIUS + MAX_DEPTH * RING_WIDTH + 20;
   const viewBox = `${-maxR} ${-maxR} ${maxR * 2} ${maxR * 2}`;
 
+  // Arc click: zoom only for nodes with children, onSelect for leaves
   const handleArcClick = useCallback((seq: string, e: React.MouseEvent) => {
     e.stopPropagation();
     const children = tree.childrenMap.get(seq) || [];
     if (children.length > 0) {
       setZoomRoot(seq);
+    } else {
+      onSelect(seq);
     }
-    onSelect(seq);
   }, [tree, onSelect]);
 
+  // Center click: open side panel for the current zoomed item
+  const handleCenterClick = useCallback(() => {
+    if (effectiveRoot) {
+      onSelect(effectiveRoot);
+    }
+  }, [effectiveRoot, onSelect]);
+
+  // Back button
   const handleBackClick = useCallback(() => {
     if (!zoomRoot) return;
     const parent = tree.parentMap.get(zoomRoot);
     setZoomRoot(parent || null);
   }, [zoomRoot, tree]);
 
+  // Wheel zoom
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault();
+    setScale(prev => Math.min(3, Math.max(0.5, prev - e.deltaY * 0.001)));
+  }, []);
+
+  // Pan handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    isPanning.current = true;
+    panStart.current = { x: e.clientX, y: e.clientY, panX, panY };
+  }, [panX, panY]);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning.current) return;
+    const dx = e.clientX - panStart.current.x;
+    const dy = e.clientY - panStart.current.y;
+    setPanX(panStart.current.panX + dx / scale);
+    setPanY(panStart.current.panY + dy / scale);
+  }, [scale]);
+
+  const handleMouseUp = useCallback(() => {
+    isPanning.current = false;
+  }, []);
+
   return (
     <div className="w-full h-full flex items-center justify-center bg-background relative select-none">
-      <svg viewBox={viewBox} className="w-full h-full max-w-[800px] max-h-[800px]">
-        {/* Center circle */}
-        <circle
-          cx={0} cy={0} r={CENTER_RADIUS}
-          className="fill-primary/20 stroke-primary/40 cursor-pointer"
-          strokeWidth={2}
+      {/* Back button overlay */}
+      {zoomRoot && (
+        <button
           onClick={handleBackClick}
-        />
-        <text x={0} y={-8} textAnchor="middle" className="fill-foreground text-[11px] font-bold pointer-events-none">
-          {rootRow?.Item || 'Root'}
-        </text>
-        <text x={0} y={8} textAnchor="middle" className="fill-muted-foreground text-[9px] pointer-events-none">
-          {rootRow?.ItemDesc?.slice(0, 20) || ''}
-        </text>
-        {zoomRoot && (
-          <text x={0} y={22} textAnchor="middle" className="fill-primary text-[8px] pointer-events-none">
-            ↩ click to go back
-          </text>
-        )}
+          className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 border border-border text-foreground text-xs font-medium transition-colors"
+        >
+          <Undo2 size={14} />
+          חזרה
+        </button>
+      )}
 
-        {/* Arcs */}
-        {arcs.map((arc) => {
-          const color = LEVEL_COLORS[arc.level % LEVEL_COLORS.length];
-          const isSelected = arc.seq === selectedNode;
-          const isHovered = arc.seq === hoveredSeq;
-          return (
-            <g key={arc.seq}>
-              <path
-                d={arcPath(0, 0, arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle)}
-                fill={color}
-                opacity={isHovered ? 1 : isSelected ? 0.95 : 0.75}
-                stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--background))'}
-                strokeWidth={isSelected ? 2.5 : 1}
-                className="cursor-pointer transition-opacity duration-150"
-                onClick={(e) => handleArcClick(arc.seq, e)}
-                onMouseEnter={() => setHoveredSeq(arc.seq)}
-                onMouseLeave={() => setHoveredSeq(null)}
-              />
-              {/* Label — only if arc is big enough */}
-              {(arc.endAngle - arc.startAngle) > 12 && (
-                (() => {
-                  const midAngle = (arc.startAngle + arc.endAngle) / 2;
-                  const midR = (arc.innerRadius + arc.outerRadius) / 2;
-                  const pos = polarToCartesian(0, 0, midR, midAngle);
-                  return (
-                    <text
-                      x={pos.x} y={pos.y}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      className="fill-foreground text-[7px] font-medium pointer-events-none"
-                      transform={`rotate(${midAngle > 90 && midAngle < 270 ? midAngle + 180 : midAngle}, ${pos.x}, ${pos.y})`}
-                    >
-                      {arc.item.slice(0, 12)}
-                    </text>
-                  );
-                })()
-              )}
-            </g>
-          );
-        })}
+      <svg
+        viewBox={viewBox}
+        className="w-full h-full max-w-[800px] max-h-[800px]"
+        onWheel={handleWheel}
+        onMouseDown={handleMouseDown}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+        <g transform={`translate(${panX}, ${panY}) scale(${scale})`}>
+          {/* Center circle */}
+          <circle
+            cx={0} cy={0} r={CENTER_RADIUS}
+            className="fill-primary/20 stroke-primary/40 cursor-pointer"
+            strokeWidth={2}
+            onClick={handleCenterClick}
+          />
+          <text x={0} y={-8} textAnchor="middle" className="fill-foreground text-[11px] font-bold pointer-events-none">
+            {rootRow?.Item || 'Root'}
+          </text>
+          <text x={0} y={8} textAnchor="middle" className="fill-muted-foreground text-[9px] pointer-events-none">
+            {rootRow?.ItemDesc?.slice(0, 20) || ''}
+          </text>
+          <text x={0} y={22} textAnchor="middle" className="fill-primary text-[8px] pointer-events-none">
+            לחץ לפרטים
+          </text>
+
+          {/* Arcs */}
+          {arcs.map((arc) => {
+            const color = LEVEL_COLORS[arc.level % LEVEL_COLORS.length];
+            const isSelected = arc.seq === selectedNode;
+            const isHovered = arc.seq === hoveredSeq;
+            return (
+              <g key={arc.seq}>
+                <path
+                  d={arcPath(0, 0, arc.innerRadius, arc.outerRadius, arc.startAngle, arc.endAngle)}
+                  fill={color}
+                  opacity={isHovered ? 1 : isSelected ? 0.95 : 0.75}
+                  stroke={isSelected ? 'hsl(var(--primary))' : 'hsl(var(--background))'}
+                  strokeWidth={isSelected ? 2.5 : 1}
+                  className="cursor-pointer transition-opacity duration-150"
+                  onClick={(e) => handleArcClick(arc.seq, e)}
+                  onMouseEnter={() => setHoveredSeq(arc.seq)}
+                  onMouseLeave={() => setHoveredSeq(null)}
+                />
+                {(arc.endAngle - arc.startAngle) > 12 && (
+                  (() => {
+                    const midAngle = (arc.startAngle + arc.endAngle) / 2;
+                    const midR = (arc.innerRadius + arc.outerRadius) / 2;
+                    const pos = polarToCartesian(0, 0, midR, midAngle);
+                    return (
+                      <text
+                        x={pos.x} y={pos.y}
+                        textAnchor="middle"
+                        dominantBaseline="central"
+                        className="fill-foreground text-[7px] font-medium pointer-events-none"
+                        transform={`rotate(${midAngle > 90 && midAngle < 270 ? midAngle + 180 : midAngle}, ${pos.x}, ${pos.y})`}
+                      >
+                        {arc.item.slice(0, 12)}
+                      </text>
+                    );
+                  })()
+                )}
+              </g>
+            );
+          })}
+        </g>
       </svg>
 
       {/* Tooltip */}
@@ -206,7 +266,7 @@ export default function BomSunburst({ tree, rootSeq, onSelect, selectedNode }: P
             <span>Level: <span className="text-foreground font-medium">{hoveredRow.Level}</span></span>
           </div>
           {(tree.childrenMap.get(hoveredRow.Seq) || []).length > 0 && (
-            <p className="text-primary text-[10px]">Click to zoom in</p>
+            <p className="text-primary text-[10px]">לחץ כדי להתקרב</p>
           )}
         </div>
       )}
