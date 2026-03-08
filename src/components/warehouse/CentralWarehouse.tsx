@@ -54,10 +54,30 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
 
   if (catalog.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4 p-8">
-        <Package className="w-16 h-16 opacity-30" />
-        <p className="text-lg font-medium">Warehouse catalog is empty</p>
-        <p className="text-sm">Add items from the BOM Explorer tab or create them manually.</p>
+      <div className="flex flex-col items-center justify-center h-full p-8">
+        <div className="max-w-md w-full border border-dashed border-border rounded-2xl p-6 text-center bg-card/60">
+          <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center mx-auto mb-4">
+            <Package className="w-7 h-7 text-primary" />
+          </div>
+          <h2 className="text-lg font-semibold text-foreground mb-1">Your Warehouse catalog is empty</h2>
+          <p className="text-sm text-muted-foreground mb-4">
+            Start by importing items from a BOM or by creating items manually. Once items are here, you can manage
+            quantities, serial numbers, and locations.
+          </p>
+          <div className="space-y-2">
+            <Button
+              size="sm"
+              className="w-full justify-center gap-2"
+              onClick={() => toast.info('Go to the BOM Explorer tab and use \"Select for Warehouse\" to add items.')}
+            >
+              Import items from BOM Explorer
+            </Button>
+            <p className="text-[11px] text-muted-foreground">
+              Tip: In BOM Explorer, switch to &quot;Select for Warehouse&quot; mode to choose which BOM items become
+              part of this catalog.
+            </p>
+          </div>
+        </div>
       </div>
     );
   }

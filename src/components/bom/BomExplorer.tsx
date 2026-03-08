@@ -6,6 +6,8 @@ import { BomSidePanel, BomChildrenBrowser, BomSearchDialog } from './BomPanels';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, Search, ArrowLeft, Zap, FileSpreadsheet, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -23,21 +25,70 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
+  const [previewData, setPreviewData] = useState<{ rows: BomRow[]; filename?: string } | null>(null);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewIssues, setPreviewIssues] = useState<string[]>([]);
+  const [fileInfo, setFileInfo] = useState<{ name: string; rowCount: number; loadedAt: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Load CSV
-  const loadCSV = useCallback((text: string) => {
+  // Build tree from parsed rows
+  const buildFromRows = useCallback((rows: BomRow[], meta?: { filename?: string }) => {
+    if (rows.length === 0) {
+      toast.error('No data found in CSV');
+      return;
+    }
+    const t = buildTree(rows);
+    setTree(t);
+    setSelectedRoot(t.roots[0]?.Seq || '');
+    setExpandedNodes(new Set());
+    setSelectedNode(null);
+    setFocusedNode(null);
+    setCheckedItems(new Set());
+    setBrowserParent(null);
+    setSearchOpen(false);
+    setFileInfo({
+      name: meta?.filename || 'BOM CSV',
+      rowCount: rows.length,
+      loadedAt: new Date().toISOString(),
+    });
+    toast.success(`Loaded ${rows.length} items`);
+  }, []);
+
+  // Load CSV directly (used for demo button)
+  const loadCSV = useCallback((text: string, meta?: { filename?: string }) => {
     try {
       const rows = parseCSV(text);
-      if (rows.length === 0) { toast.error('No data found in CSV'); return; }
-      const t = buildTree(rows);
-      setTree(t);
-      setSelectedRoot(t.roots[0]?.Seq || '');
-      setExpandedNodes(new Set());
-      setSelectedNode(null);
-      setFocusedNode(null);
-      setCheckedItems(new Set());
-      toast.success(`Loaded ${rows.length} items`);
+      buildFromRows(rows, meta);
+    } catch (e: any) {
+      toast.error('Failed to parse CSV: ' + e.message);
+    }
+  }, [buildFromRows]);
+
+  // Parse and open preview dialog (used for user-uploaded files)
+  const openPreview = useCallback((text: string, filename?: string) => {
+    try {
+      const rows = parseCSV(text);
+      if (rows.length === 0) {
+        toast.error('No data found in CSV');
+        return;
+      }
+
+      const issues: string[] = [];
+      const hasItem = rows.some(r => r.Item);
+      const hasItemDesc = rows.some(r => r.ItemDesc);
+      const hasLevel = rows.some(r => typeof r.Level === 'number' && !Number.isNaN(r.Level));
+      const hasParent = rows.some(r => r.Parent);
+      const hasPath = rows.some(r => r.Path);
+
+      if (!hasItem) issues.push('Item');
+      if (!hasItemDesc) issues.push('ItemDesc');
+      if (!hasLevel) issues.push('Level');
+      if (!hasParent) issues.push('Parent');
+      if (!hasPath) issues.push('Path');
+
+      setPreviewIssues(issues);
+      setPreviewData({ rows, filename });
+      setPreviewOpen(true);
     } catch (e: any) {
       toast.error('Failed to parse CSV: ' + e.message);
     }
@@ -47,18 +98,18 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => loadCSV(ev.target?.result as string);
+    reader.onload = (ev) => openPreview(ev.target?.result as string, file.name);
     reader.readAsText(file);
-  }, [loadCSV]);
+  }, [openPreview]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     const file = e.dataTransfer.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => loadCSV(ev.target?.result as string);
+    reader.onload = (ev) => openPreview(ev.target?.result as string, file.name);
     reader.readAsText(file);
-  }, [loadCSV]);
+  }, [openPreview]);
 
   // Graph actions
   const onToggle = useCallback((seq: string) => {
@@ -180,14 +231,28 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         onDragOver={e => e.preventDefault()}
         onDrop={handleDrop}
       >
-        <div className="text-center max-w-lg">
-          <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-6 animate-float">
+        <div className="text-center max-w-xl space-y-6">
+          <div className="w-20 h-20 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center mx-auto mb-4 animate-float">
             <Zap className="w-10 h-10 text-primary" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">BOM WOW Explorer</h1>
-          <p className="text-muted-foreground mb-8">
-            Visualize your Bill of Materials as an interactive graph. Upload a CSV from Priority ERP or try the demo.
-          </p>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground mb-2">BOM WOW Explorer</h1>
+            <p className="text-muted-foreground">
+              Visualize your Bill of Materials as an interactive graph and connect it to your Warehouse.
+            </p>
+          </div>
+
+          <div className="bg-muted/40 border border-border rounded-xl p-4 text-left">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              What can you do here?
+            </p>
+            <ul className="text-sm text-muted-foreground space-y-1 list-disc list-inside">
+              <li>Upload a BOM CSV exported from your ERP.</li>
+              <li>Explore the structure as an interactive graph or table.</li>
+              <li>Select items and send them to the Warehouse catalog.</li>
+            </ul>
+          </div>
+
           <div className="space-y-3">
             <div
               className="border-2 border-dashed border-border rounded-xl p-8 hover:border-primary/50 transition-colors cursor-pointer"
@@ -197,19 +262,27 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
               <p className="text-sm text-muted-foreground">
                 Drop CSV here or <span className="text-primary">click to browse</span>
               </p>
-              <p className="text-xs text-muted-foreground/60 mt-1">
-                Columns: Seq, Level, Item, ItemDesc, Parent, ParentDesc, QtyPerParent, CumQty, Path, HasChildren
+              <p className="text-xs text-muted-foreground/70 mt-2">
+                Expected columns (case-insensitive): Seq, Level, Item, ItemDesc, Parent, ParentDesc, QtyPerParent, CumQty, Path, HasChildren
               </p>
             </div>
             <input ref={fileRef} type="file" accept=".csv" className="hidden" onChange={handleFile} />
             <Button
               variant="outline"
               className="w-full border-primary/30 text-primary hover:bg-primary/10"
-              onClick={() => loadCSV(DEMO_CSV)}
+              onClick={() => loadCSV(DEMO_CSV, { filename: 'Demo: Mountain Bike BOM' })}
             >
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               Load Demo Data (Mountain Bike BOM)
             </Button>
+          </div>
+
+          <div className="bg-card/60 border border-dashed border-primary/30 rounded-lg p-3 text-left text-xs text-muted-foreground">
+            <p className="font-medium text-foreground mb-1">Demo tips</p>
+            <p>
+              The demo BOM is a complete Mountain Bike assembly. Use it to try the graph, focus mode, search
+              and the &quot;Select for Warehouse&quot; flow before connecting your own data.
+            </p>
           </div>
         </div>
       </div>
@@ -237,6 +310,14 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         )}
 
         <Badge variant="secondary" className="text-xs">{tree.rows.length} items</Badge>
+
+        {fileInfo && (
+          <div className="flex items-center gap-2 text-[11px] text-muted-foreground ml-2">
+            <span className="max-w-[160px] truncate" title={fileInfo.name}>{fileInfo.name}</span>
+            <span>• {fileInfo.rowCount} rows</span>
+            <span>• loaded {new Date(fileInfo.loadedAt).toLocaleTimeString()}</span>
+          </div>
+        )}
 
         {focusedNode && (
           <>
@@ -336,6 +417,115 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         rows={tree.rows}
         onSelect={onSearchSelect}
       />
+
+      {/* CSV preview dialog */}
+      <Dialog
+        open={previewOpen}
+        onOpenChange={(open) => {
+          setPreviewOpen(open);
+          if (!open) {
+            setPreviewData(null);
+            setPreviewIssues([]);
+          }
+        }}
+      >
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Review CSV before import</DialogTitle>
+            <DialogDescription>
+              Check that the columns look correct before building the BOM graph.
+            </DialogDescription>
+          </DialogHeader>
+
+          {previewData && (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                {previewData.filename && (
+                  <span className="max-w-[220px] truncate" title={previewData.filename}>
+                    File: <span className="font-mono text-foreground">{previewData.filename}</span>
+                  </span>
+                )}
+                <span>{previewData.rows.length} data rows</span>
+              </div>
+
+              {previewIssues.length > 0 && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive space-y-1">
+                  <p className="font-medium">Some required BOM fields look empty.</p>
+                  <p>
+                    Missing data for: {previewIssues.join(', ')}. Please check that your CSV includes these columns
+                    (case-insensitive) before continuing.
+                  </p>
+                </div>
+              )}
+
+              <div className="border rounded-md max-h-64 overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="w-16">Seq</TableHead>
+                      <TableHead className="w-16">Level</TableHead>
+                      <TableHead>Item</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Parent</TableHead>
+                      <TableHead>Parent Desc</TableHead>
+                      <TableHead className="w-24">Qty/Parent</TableHead>
+                      <TableHead className="w-24">Cum Qty</TableHead>
+                      <TableHead>Path</TableHead>
+                      <TableHead className="w-20">HasChildren</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {previewData.rows.slice(0, 8).map(row => (
+                      <TableRow key={row.Seq}>
+                        <TableCell className="font-mono text-xs">{row.Seq}</TableCell>
+                        <TableCell className="text-xs">{row.Level}</TableCell>
+                        <TableCell className="font-mono text-xs">{row.Item}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{row.ItemDesc}</TableCell>
+                        <TableCell className="font-mono text-xs">{row.Parent}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{row.ParentDesc}</TableCell>
+                        <TableCell className="text-xs">{row.QtyPerParent}</TableCell>
+                        <TableCell className="text-xs">{row.CumQty}</TableCell>
+                        <TableCell className="text-[10px] text-muted-foreground">{row.Path}</TableCell>
+                        <TableCell className="text-xs">{row.HasChildren ? 'true' : 'false'}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                Showing up to 8 example rows. If everything looks good, continue to build the interactive BOM graph.
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => {
+                setPreviewOpen(false);
+                setPreviewData(null);
+                setPreviewIssues([]);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!previewData || previewIssues.length > 0}
+              onClick={() => {
+                if (!previewData) return;
+                buildFromRows(previewData.rows, { filename: previewData.filename });
+                setPreviewOpen(false);
+                setPreviewData(null);
+                setPreviewIssues([]);
+              }}
+            >
+              Use this file
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

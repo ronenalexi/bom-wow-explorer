@@ -99,9 +99,26 @@ export default function LocationsManager({ onRefresh, refreshKey }: Props) {
 
       <div className="flex-1 overflow-auto p-4">
         {locations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-4">
-            <MapPin className="w-16 h-16 opacity-30" />
-            <p>No locations yet. Create one to start tracking equipment placement.</p>
+          <div className="flex flex-col items-center justify-center h-full">
+            <div className="max-w-md w-full border border-dashed border-border rounded-2xl p-6 text-center bg-card/60 text-muted-foreground space-y-4">
+              <div className="w-14 h-14 rounded-xl bg-primary/10 border border-primary/30 flex items-center justify-center mx-auto">
+                <MapPin className="w-7 h-7 text-primary" />
+              </div>
+              <div>
+                <p className="text-base font-medium text-foreground">No locations yet</p>
+                <p className="text-sm mt-1">
+                  Create locations to track where your equipment and parts are: people, departments, flight cases,
+                  shipments and more.
+                </p>
+              </div>
+              <Button onClick={() => setAddDialogOpen(true)} className="gap-2 justify-center w-full">
+                <Plus className="w-4 h-4" /> Create first location
+              </Button>
+              <p className="text-[11px]">
+                Tip: After you have a location, open it and use &quot;Add Items from Central&quot; to move inventory
+                from the Central Warehouse.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
