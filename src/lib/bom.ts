@@ -49,16 +49,63 @@ export function buildTree(rows: BomRow[]): TreeData {
     rowBySeq.set(row.Seq, row);
   }
 
-  // Build a lookup: for each row, track the most recent Seq for each Item at each Level.
-  // This handles duplicate Items across different assemblies by using row order + Level.
-  const lastSeqByItemAtLevel = new Map<string, string>(); // `${Item}@${Level}` → Seq
+  // Detect true root(s): items that appear as Parent but NOT as Item in any row
+  const allItems = new Set(rows.map(r => r.Item));
+  const allParents = new Set(rows.filter(r => r.Parent).map(r => r.Parent));
+  const missingRootItems = new Set<string>();
+  for (const p of allParents) {
+    if (!allItems.has(p)) missingRootItems.add(p);
+  }
+
+  // Also try extracting root from Path (first segment)
+  for (const row of rows) {
+    if (row.Path) {
+      const firstInPath = row.Path.split('>')[0].trim();
+      if (firstInPath && !allItems.has(firstInPath)) {
+        missingRootItems.add(firstInPath);
+      }
+    }
+  }
+
+  // Create virtual root rows for missing root items
+  let nextSeq = rows.length > 0 ? Math.max(...rows.map(r => parseInt(r.Seq) || 0)) + 1000 : 1000;
+  const virtualRoots: BomRow[] = [];
+  for (const rootItem of missingRootItems) {
+    // Find description from ParentDesc of children
+    const childRow = rows.find(r => r.Parent === rootItem);
+    const desc = childRow?.ParentDesc || rootItem;
+    const vRoot: BomRow = {
+      Seq: String(nextSeq++),
+      Level: minLevel > 0 ? minLevel - 1 : 0,
+      Item: rootItem,
+      ItemDesc: desc,
+      Parent: '',
+      ParentDesc: '',
+      QtyPerParent: 0,
+      CumQty: 1,
+      Path: rootItem,
+      HasChildren: true,
+    };
+    virtualRoots.push(vRoot);
+    rowBySeq.set(vRoot.Seq, vRoot);
+  }
+
+  const effectiveMinLevel = virtualRoots.length > 0
+    ? Math.min(minLevel, ...virtualRoots.map(r => r.Level))
+    : minLevel;
+
+  // Build parent-child relationships using Parent column
+  const lastSeqByItemAtLevel = new Map<string, string>();
+
+  // Register virtual roots first
+  for (const vr of virtualRoots) {
+    lastSeqByItemAtLevel.set(`${vr.Item}@${vr.Level}`, vr.Seq);
+  }
 
   for (const row of rows) {
     lastSeqByItemAtLevel.set(`${row.Item}@${row.Level}`, row.Seq);
 
-    if (row.Level > minLevel && row.Parent) {
-      // Find the parent: look for the most recent row with Item == row.Parent at Level == row.Level - 1
-      // If not found at exact level, search upward or use Path-based matching
+    if (row.Parent) {
       let parentSeq: string | undefined;
 
       // Strategy 1: Use Path to find exact parent
@@ -66,17 +113,16 @@ export function buildTree(rows: BomRow[]): TreeData {
         const pathParts = row.Path.split('>').map(s => s.trim());
         if (pathParts.length >= 2) {
           const parentItem = pathParts[pathParts.length - 2];
-          // Find the parent row: match Item == parentItem at Level == row.Level - 1
           parentSeq = lastSeqByItemAtLevel.get(`${parentItem}@${row.Level - 1}`);
         }
       }
 
-      // Strategy 2: Fallback to Parent column matching at Level - 1
+      // Strategy 2: Parent column matching at Level - 1
       if (!parentSeq) {
         parentSeq = lastSeqByItemAtLevel.get(`${row.Parent}@${row.Level - 1}`);
       }
 
-      // Strategy 3: Fallback - find any row with matching Item == Parent that was already processed
+      // Strategy 3: Fallback - any row with matching Item == Parent
       if (!parentSeq) {
         for (const [seq, r] of rowBySeq) {
           if (r.Item === row.Parent && parseInt(seq) < parseInt(row.Seq)) {
@@ -93,8 +139,19 @@ export function buildTree(rows: BomRow[]): TreeData {
     }
   }
 
-  const roots = rows.filter(r => r.Level === minLevel);
-  return { rows, childrenMap, rowBySeq, roots, parentMap };
+  // Roots: virtual roots + any rows at effectiveMinLevel without a parent
+  const roots = [
+    ...virtualRoots,
+    ...rows.filter(r => r.Level === effectiveMinLevel && !parentMap.has(r.Seq)),
+  ];
+
+  // Ensure virtual roots have HasChildren set correctly
+  for (const vr of virtualRoots) {
+    vr.HasChildren = (childrenMap.get(vr.Seq)?.length || 0) > 0;
+  }
+
+  const allRows = [...virtualRoots, ...rows];
+  return { rows: allRows, childrenMap, rowBySeq, roots, parentMap };
 }
 
 export const THRESHOLD_ALL = 25;
