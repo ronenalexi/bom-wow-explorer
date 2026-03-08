@@ -43,7 +43,7 @@ export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate
 
   return (
     <Sheet open={open} onOpenChange={(o) => !o && onClose()}>
-      <SheetContent className="w-[380px] bg-card border-border">
+      <SheetContent className="w-[380px] bg-card border-border flex flex-col overflow-hidden">
         <SheetHeader>
           <SheetTitle className="text-primary font-mono">{row.Item}</SheetTitle>
         </SheetHeader>
