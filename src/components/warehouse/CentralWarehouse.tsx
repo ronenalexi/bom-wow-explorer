@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { Search, Plus, Package, Hash, Trash2, PlusCircle } from 'lucide-react';
+import { Search, Plus, Package, Hash, Trash2, PlusCircle, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
 
@@ -22,6 +23,7 @@ interface Props {
 
 export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
   const [search, setSearch] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [addSerialDialog, setAddSerialDialog] = useState<string | null>(null);
   const [serialInput, setSerialInput] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ item_code: string; inLocations: boolean } | null>(null);
@@ -30,10 +32,18 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
 
   const catalog = useMemo(() => getCatalog(), [refreshKey]);
 
+  const categories = useMemo(() => {
+    const cats = new Set(catalog.map(c => c.category).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [catalog]);
+
+
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return catalog.filter(c => c.item_code.toLowerCase().includes(q) || c.item_desc.toLowerCase().includes(q));
-  }, [catalog, search]);
+    return catalog
+      .filter(c => c.item_code.toLowerCase().includes(q) || c.item_desc.toLowerCase().includes(q))
+      .filter(c => categoryFilter === 'all' || c.category === categoryFilter);
+  }, [catalog, search, categoryFilter]);
 
   const handleQtyChange = useCallback((item_code: string, val: string) => {
     const qty = Math.max(0, parseInt(val) || 0);
@@ -121,6 +131,18 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
         <h2 className="font-bold text-foreground text-lg">Central Warehouse</h2>
         <Badge variant="secondary">{catalog.length} items</Badge>
         <div className="flex-1" />
+        {categories.length > 0 && (
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="w-36 h-9">
+              <Tag className="w-3.5 h-3.5 mr-1.5" />
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              {categories.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        )}
         <div className="relative w-64">
           <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search items..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8" />
@@ -136,6 +158,7 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
             <TableRow>
               <TableHead className="w-40">Item Code</TableHead>
               <TableHead>Description</TableHead>
+              <TableHead className="w-28">Category</TableHead>
               <TableHead className="w-24 text-center">Serialized</TableHead>
               <TableHead className="w-32 text-center">Qty On Hand</TableHead>
               <TableHead className="w-24 text-center">Total</TableHead>
@@ -170,6 +193,14 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                 <TableRow key={item.item_code}>
                   <TableCell className="font-mono font-bold text-foreground">{item.item_code}</TableCell>
                   <TableCell className="text-muted-foreground">{item.item_desc}</TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-7 text-xs w-24"
+                      placeholder="—"
+                      value={item.category}
+                      onChange={e => { updateCatalogItem(item.item_code, { category: e.target.value }); onRefresh(); }}
+                    />
+                  </TableCell>
                   <TableCell className="text-center">
                     <Checkbox
                       checked={item.is_serialized}

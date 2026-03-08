@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, RotateCcw, MapPin, ArrowLeft, Package, Send } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, MapPin, ArrowLeft, Package, Send, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 const LOCATION_TYPES: LocationType[] = ['Person', 'Department', 'Shipment', 'Overseas', 'Flight Case', 'Other'];
@@ -31,8 +31,15 @@ export default function LocationsManager({ onRefresh, refreshKey }: Props) {
   const [confirmReturnId, setConfirmReturnId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [transferDialogLocId, setTransferDialogLocId] = useState<string | null>(null);
+  const [locSearch, setLocSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
 
   const locations = useMemo(() => getLocations(), [refreshKey]);
+  const filteredLocations = useMemo(() => {
+    return locations
+      .filter(l => typeFilter === 'all' || l.type === typeFilter)
+      .filter(l => !locSearch || l.name.toLowerCase().includes(locSearch.toLowerCase()) || l.notes.toLowerCase().includes(locSearch.toLowerCase()));
+  }, [locations, locSearch, typeFilter]);
   const selectedLocation = locations.find(l => l.location_id === selectedLocationId);
 
   const handleAddLocation = useCallback(() => {
@@ -92,6 +99,19 @@ export default function LocationsManager({ onRefresh, refreshKey }: Props) {
         <h2 className="font-bold text-foreground text-lg">Locations</h2>
         <Badge variant="secondary">{locations.length}</Badge>
         <div className="flex-1" />
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-36 h-9">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {LOCATION_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <div className="relative w-52">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Search locations..." value={locSearch} onChange={e => setLocSearch(e.target.value)} className="pl-8" />
+        </div>
         <Button onClick={() => setAddDialogOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" /> Add Location
         </Button>
@@ -122,7 +142,7 @@ export default function LocationsManager({ onRefresh, refreshKey }: Props) {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {locations.map(loc => {
+            {filteredLocations.map(loc => {
               const items = getLocationItems(loc.location_id);
               const totalQty = items.reduce((s, i) => s + i.qty, 0);
               return (

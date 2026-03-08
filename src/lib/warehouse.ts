@@ -143,12 +143,29 @@ export function getSerialsAtLocation(item_code: string, location_id: string): Se
   return getSerials().filter(u => u.item_code === item_code && u.current_location_id === location_id);
 }
 
-export function moveSerials(serialIds: string[], toLocationId: string) {
+export function moveSerials(serialIds: string[], toLocationId: string, fromName?: string, toName?: string) {
   const units = getSerials();
+  const movedSerials: string[] = [];
   for (const u of units) {
-    if (serialIds.includes(u.serial_id)) u.current_location_id = toLocationId;
+    if (serialIds.includes(u.serial_id)) {
+      if (!fromName) fromName = u.current_location_id === 'CENTRAL' ? 'Central' : u.current_location_id;
+      movedSerials.push(u.serial_number);
+      u.current_location_id = toLocationId;
+    }
   }
   saveSerials(units);
+  if (movedSerials.length > 0) {
+    import('./warehouseHistory').then(({ addTransferLogEntry }) => {
+      addTransferLogEntry({
+        item_code: units.find(u => serialIds.includes(u.serial_id))?.item_code || '',
+        qty: movedSerials.length,
+        from: fromName || 'Central',
+        to: toName || toLocationId,
+        type: 'serial',
+        serial_numbers: movedSerials,
+      });
+    });
+  }
 }
 
 // ── Locations ──
@@ -180,7 +197,7 @@ export function getLocationQty(location_id: string, item_code: string): number {
 }
 
 // ── Transfers ──
-export function transferBulkToLocation(item_code: string, qty: number, location_id: string): boolean {
+export function transferBulkToLocation(item_code: string, qty: number, location_id: string, locationName?: string): boolean {
   const centralQty = getCentralQty(item_code);
   if (qty > centralQty) return false;
   setCentralQty(item_code, centralQty - qty);
@@ -189,10 +206,14 @@ export function transferBulkToLocation(item_code: string, qty: number, location_
   if (idx >= 0) inv[idx].qty += qty;
   else inv.push({ location_id, item_code, qty });
   saveLocationInventory(inv);
+  // Log transfer
+  import('./warehouseHistory').then(({ addTransferLogEntry }) => {
+    addTransferLogEntry({ item_code, qty, from: 'Central', to: locationName || location_id, type: 'bulk' });
+  });
   return true;
 }
 
-export function returnBulkFromLocation(item_code: string, qty: number, location_id: string) {
+export function returnBulkFromLocation(item_code: string, qty: number, location_id: string, locationName?: string) {
   const inv = getLocationInventory();
   const idx = inv.findIndex(e => e.location_id === location_id && e.item_code === item_code);
   if (idx < 0) return;
@@ -201,6 +222,9 @@ export function returnBulkFromLocation(item_code: string, qty: number, location_
   if (inv[idx].qty <= 0) inv.splice(idx, 1);
   saveLocationInventory(inv);
   setCentralQty(item_code, getCentralQty(item_code) + actual);
+  import('./warehouseHistory').then(({ addTransferLogEntry }) => {
+    addTransferLogEntry({ item_code, qty: actual, from: locationName || location_id, to: 'Central', type: 'bulk' });
+  });
 }
 
 export function returnAllFromLocation(location_id: string): { bulkItems: number; bulkQty: number; serialCount: number } {
