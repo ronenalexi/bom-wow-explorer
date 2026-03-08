@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useMemo, useRef } from 'react';
-import { parseCSV, buildTree, deriveGraph, expandPathToNode, DEMO_CSV, type TreeData, type BomRow } from '@/lib/bom';
+import { parseCSV, parseCSVRaw, autoMatchHeaders, mapRows, buildTree, deriveGraph, expandPathToNode, DEMO_CSV, BOM_FIELDS, type TreeData, type BomRow, type BomField, type ColumnMapping } from '@/lib/bom';
 import { addCatalogItems } from '@/lib/warehouse';
 import BomGraph from './BomGraph';
 import { BomSidePanel, BomChildrenBrowser, BomSearchDialog } from './BomPanels';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Upload, Search, ArrowLeft, Zap, FileSpreadsheet, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
@@ -25,11 +26,19 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
-  const [previewData, setPreviewData] = useState<{ rows: BomRow[]; filename?: string } | null>(null);
+  const [previewRaw, setPreviewRaw] = useState<{ headers: string[]; rawRows: Record<string, string>[]; filename?: string } | null>(null);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewIssues, setPreviewIssues] = useState<string[]>([]);
   const [fileInfo, setFileInfo] = useState<{ name: string; rowCount: number; loadedAt: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Derived: preview rows based on current mapping
+  const previewMappedRows = useMemo(() => {
+    if (!previewRaw) return [];
+    return mapRows(previewRaw.rawRows.slice(0, 8), columnMapping);
+  }, [previewRaw, columnMapping]);
+
+  const mappingHasItem = !!columnMapping.Item;
 
   // Build tree from parsed rows
   const buildFromRows = useCallback((rows: BomRow[], meta?: { filename?: string }) => {
@@ -64,30 +73,17 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
     }
   }, [buildFromRows]);
 
-  // Parse and open preview dialog (used for user-uploaded files)
+  // Parse and open preview dialog with column mapping
   const openPreview = useCallback((text: string, filename?: string) => {
     try {
-      const rows = parseCSV(text);
-      if (rows.length === 0) {
+      const { headers, rawRows } = parseCSVRaw(text);
+      if (rawRows.length === 0) {
         toast.error('No data found in CSV');
         return;
       }
-
-      const issues: string[] = [];
-      const hasItem = rows.some(r => r.Item);
-      const hasItemDesc = rows.some(r => r.ItemDesc);
-      const hasLevel = rows.some(r => typeof r.Level === 'number' && !Number.isNaN(r.Level));
-      const hasParent = rows.some(r => r.Parent);
-      const hasPath = rows.some(r => r.Path);
-
-      if (!hasItem) issues.push('Item');
-      if (!hasItemDesc) issues.push('ItemDesc');
-      if (!hasLevel) issues.push('Level');
-      if (!hasParent) issues.push('Parent');
-      if (!hasPath) issues.push('Path');
-
-      setPreviewIssues(issues);
-      setPreviewData({ rows, filename });
+      const autoMapping = autoMatchHeaders(headers);
+      setColumnMapping(autoMapping);
+      setPreviewRaw({ headers, rawRows, filename });
       setPreviewOpen(true);
     } catch (e: any) {
       toast.error('Failed to parse CSV: ' + e.message);
@@ -418,82 +414,110 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         onSelect={onSearchSelect}
       />
 
-      {/* CSV preview dialog */}
+      {/* CSV preview dialog with column mapping */}
       <Dialog
         open={previewOpen}
         onOpenChange={(open) => {
           setPreviewOpen(open);
           if (!open) {
-            setPreviewData(null);
-            setPreviewIssues([]);
+            setPreviewRaw(null);
+            setColumnMapping({});
           }
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Review CSV before import</DialogTitle>
+            <DialogTitle>Map CSV Columns</DialogTitle>
             <DialogDescription>
-              Check that the columns look correct before building the BOM graph.
+              Match your CSV headers to BOM fields. At minimum, map the "Item" field.
             </DialogDescription>
           </DialogHeader>
 
-          {previewData && (
-            <div className="space-y-3">
+          {previewRaw && (
+            <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                {previewData.filename && (
-                  <span className="max-w-[220px] truncate" title={previewData.filename}>
-                    File: <span className="font-mono text-foreground">{previewData.filename}</span>
+                {previewRaw.filename && (
+                  <span className="max-w-[220px] truncate" title={previewRaw.filename}>
+                    File: <span className="font-mono text-foreground">{previewRaw.filename}</span>
                   </span>
                 )}
-                <span>{previewData.rows.length} data rows</span>
+                <span>{previewRaw.rawRows.length} data rows</span>
+                <span>• {previewRaw.headers.length} columns</span>
               </div>
 
-              {previewIssues.length > 0 && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive space-y-1">
-                  <p className="font-medium">Some required BOM fields look empty.</p>
-                  <p>
-                    Missing data for: {previewIssues.join(', ')}. Please check that your CSV includes these columns
-                    (case-insensitive) before continuing.
-                  </p>
+              {/* Column mapping grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {BOM_FIELDS.map(field => (
+                  <div key={field} className="space-y-1">
+                    <label className="text-xs font-medium text-foreground">
+                      {field}
+                      {field === 'Item' && <span className="text-destructive ml-0.5">*</span>}
+                    </label>
+                    <Select
+                      value={columnMapping[field] || '__none__'}
+                      onValueChange={(val) => {
+                        setColumnMapping(prev => {
+                          const next = { ...prev };
+                          if (val === '__none__') {
+                            delete next[field];
+                          } else {
+                            next[field] = val;
+                          }
+                          return next;
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="— skip —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— skip —</SelectItem>
+                        {previewRaw.headers.map(h => (
+                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              {!mappingHasItem && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  <p className="font-medium">Map at least the "Item" column to continue.</p>
                 </div>
               )}
 
-              <div className="border rounded-md max-h-64 overflow-auto">
+              {/* Live preview table */}
+              <div className="border rounded-md max-h-48 overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-16">Seq</TableHead>
-                      <TableHead className="w-16">Level</TableHead>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Parent</TableHead>
-                      <TableHead>Parent Desc</TableHead>
-                      <TableHead className="w-24">Qty/Parent</TableHead>
-                      <TableHead className="w-24">Cum Qty</TableHead>
-                      <TableHead>Path</TableHead>
-                      <TableHead className="w-20">HasChildren</TableHead>
+                      <TableHead className="w-16 text-xs">Seq</TableHead>
+                      <TableHead className="w-16 text-xs">Level</TableHead>
+                      <TableHead className="text-xs">Item</TableHead>
+                      <TableHead className="text-xs">Description</TableHead>
+                      <TableHead className="text-xs">Parent</TableHead>
+                      <TableHead className="text-xs">Qty</TableHead>
+                      <TableHead className="text-xs">Path</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {previewData.rows.slice(0, 8).map(row => (
-                      <TableRow key={row.Seq}>
+                    {previewMappedRows.map((row, i) => (
+                      <TableRow key={i}>
                         <TableCell className="font-mono text-xs">{row.Seq}</TableCell>
                         <TableCell className="text-xs">{row.Level}</TableCell>
                         <TableCell className="font-mono text-xs">{row.Item}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{row.ItemDesc}</TableCell>
                         <TableCell className="font-mono text-xs">{row.Parent}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{row.ParentDesc}</TableCell>
                         <TableCell className="text-xs">{row.QtyPerParent}</TableCell>
-                        <TableCell className="text-xs">{row.CumQty}</TableCell>
                         <TableCell className="text-[10px] text-muted-foreground">{row.Path}</TableCell>
-                        <TableCell className="text-xs">{row.HasChildren ? 'true' : 'false'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Showing up to 8 example rows. If everything looks good, continue to build the interactive BOM graph.
+                Live preview of first 8 rows with current mapping. Adjust dropdowns above if data looks wrong.
               </p>
             </div>
           )}
@@ -504,21 +528,22 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
               type="button"
               onClick={() => {
                 setPreviewOpen(false);
-                setPreviewData(null);
-                setPreviewIssues([]);
+                setPreviewRaw(null);
+                setColumnMapping({});
               }}
             >
               Cancel
             </Button>
             <Button
               type="button"
-              disabled={!previewData || previewIssues.length > 0}
+              disabled={!previewRaw || !mappingHasItem}
               onClick={() => {
-                if (!previewData) return;
-                buildFromRows(previewData.rows, { filename: previewData.filename });
+                if (!previewRaw) return;
+                const rows = mapRows(previewRaw.rawRows, columnMapping);
+                buildFromRows(rows, { filename: previewRaw.filename });
                 setPreviewOpen(false);
-                setPreviewData(null);
-                setPreviewIssues([]);
+                setPreviewRaw(null);
+                setColumnMapping({});
               }}
             >
               Use this file
