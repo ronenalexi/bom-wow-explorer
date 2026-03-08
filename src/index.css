@@ -132,7 +132,7 @@
   }
 }
 
-/* React Flow overrides - dark (default) */
+/* React Flow overrides */
 .react-flow__background {
   background-color: hsl(222 25% 6%) !important;
 }
@@ -167,29 +167,6 @@
 }
 .react-flow__attribution {
   display: none !important;
-}
-
-/* React Flow overrides - light */
-.light .react-flow__background {
-  background-color: hsl(210 20% 96%) !important;
-}
-.light .react-flow__controls {
-  background: hsl(0 0% 100% / 0.9) !important;
-  border: 1px solid hsl(210 15% 85%) !important;
-}
-.light .react-flow__controls-button {
-  border-bottom-color: hsl(210 15% 85%) !important;
-  fill: hsl(222 15% 30%) !important;
-}
-.light .react-flow__controls-button:hover {
-  background: hsl(210 15% 92%) !important;
-}
-.light .react-flow__minimap {
-  background: hsl(0 0% 100% / 0.9) !important;
-  border: 1px solid hsl(210 15% 85%) !important;
-}
-.light .react-flow__edge-path {
-  stroke: hsl(185 80% 30% / 0.6) !important;
 }
 
 /* Node animations */

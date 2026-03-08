@@ -366,7 +366,7 @@ function BomGraphInner({ graphNodes, graphEdges, centerNodeId, callbacks }: BomG
         defaultEdgeOptions={{ animated: false }}
         connectionLineType={ConnectionLineType.SmoothStep}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color={isDark ? "hsl(222 15% 15%)" : "hsl(210 15% 80%)"} />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(222 15% 15%)" />
         <Controls>
           <ControlButton onClick={toggleTheme} title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
             {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
@@ -376,9 +376,9 @@ function BomGraphInner({ graphNodes, graphEdges, centerNodeId, callbacks }: BomG
           nodeColor={(n) => {
             if (n.type === 'more') return 'hsl(38 95% 55%)';
             if (n.type === 'children-group') return 'hsl(185 100% 48%)';
-            return isDark ? 'hsl(222 20% 25%)' : 'hsl(210 15% 70%)';
+            return 'hsl(222 20% 25%)';
           }}
-          maskColor={isDark ? "hsl(222 25% 6% / 0.8)" : "hsl(210 20% 96% / 0.8)"}
+          maskColor="hsl(222 25% 6% / 0.8)"
         />
       </ReactFlow>
     </GraphCtx.Provider>
