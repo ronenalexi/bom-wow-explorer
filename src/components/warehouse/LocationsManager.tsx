@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, RotateCcw, MapPin, ArrowLeft, Package, Send } from 'lucide-react';
+import { Plus, Trash2, RotateCcw, MapPin, ArrowLeft, Package, Send, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 const LOCATION_TYPES: LocationType[] = ['Person', 'Department', 'Shipment', 'Overseas', 'Flight Case', 'Other'];
