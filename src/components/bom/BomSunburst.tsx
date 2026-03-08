@@ -127,13 +127,8 @@ export default function BomSunburst({ tree, rootSeq, onSelect, selectedNode }: P
   // Arc click: zoom only for nodes with children, onSelect for leaves
   const handleArcClick = useCallback((seq: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    const children = tree.childrenMap.get(seq) || [];
-    if (children.length > 0) {
-      setZoomRoot(seq);
-    } else {
-      onSelect(seq);
-    }
-  }, [tree, onSelect]);
+    setZoomRoot(seq);
+  }, []);
 
   // Center click: open side panel for the current zoomed item
   const handleCenterClick = useCallback(() => {
