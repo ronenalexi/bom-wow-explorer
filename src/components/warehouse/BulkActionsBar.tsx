@@ -58,7 +58,7 @@ export default function BulkActionsBar({ selectedCodes, onClear, onRefresh, cate
       const available = getCentralQty(code);
       const qty = Math.min(transferQty, available);
       if (qty > 0) {
-        transferBulkToLocation(code, transferLocationId, qty);
+        transferBulkToLocation(code, qty, transferLocationId);
         transferred++;
       }
     });
