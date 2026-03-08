@@ -2,21 +2,27 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { parseCSV, parseCSVRaw, autoMatchHeaders, mapRows, buildTree, deriveGraph, expandPathToNode, DEMO_CSV, BOM_FIELDS, type TreeData, type BomRow, type BomField, type ColumnMapping } from '@/lib/bom';
 import { addCatalogItems } from '@/lib/warehouse';
 import BomGraph from './BomGraph';
+import BomSunburst from './BomSunburst';
+import BomTreeTable from './BomTreeTable';
 import { BomSidePanel, BomChildrenBrowser, BomSearchDialog } from './BomPanels';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Search, ArrowLeft, Zap, FileSpreadsheet, PackagePlus } from 'lucide-react';
+import { Upload, Search, ArrowLeft, Zap, FileSpreadsheet, PackagePlus, Share2, Sun, List } from 'lucide-react';
 import { toast } from 'sonner';
+
+type ViewMode = 'graph' | 'sunburst' | 'table';
 
 interface Props {
   onWarehouseRefresh?: () => void;
 }
 
 export default function BomExplorer({ onWarehouseRefresh }: Props) {
+  const [viewMode, setViewMode] = useState<ViewMode>('graph');
   const [tree, setTree] = useState<TreeData | null>(null);
   const [selectedRoot, setSelectedRoot] = useState<string>('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
@@ -468,6 +474,21 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
 
         <div className="flex-1" />
 
+        {/* View mode toggle */}
+        <ToggleGroup type="single" value={viewMode} onValueChange={(v) => v && setViewMode(v as ViewMode)} size="sm" className="bg-muted/50 rounded-md p-0.5">
+          <ToggleGroupItem value="graph" aria-label="Graph view" className="px-2 py-1 text-xs gap-1 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+            <Share2 className="w-3.5 h-3.5" /> Graph
+          </ToggleGroupItem>
+          <ToggleGroupItem value="sunburst" aria-label="Sunburst view" className="px-2 py-1 text-xs gap-1 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+            <Sun className="w-3.5 h-3.5" /> Sunburst
+          </ToggleGroupItem>
+          <ToggleGroupItem value="table" aria-label="Table view" className="px-2 py-1 text-xs gap-1 data-[state=on]:bg-background data-[state=on]:shadow-sm">
+            <List className="w-3.5 h-3.5" /> Table
+          </ToggleGroupItem>
+        </ToggleGroup>
+
+        <div className="w-px h-6 bg-border" />
+
         {/* Select mode for warehouse */}
         <Button
           size="sm"
@@ -517,17 +538,35 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         </div>
       )}
 
-      {/* Graph */}
-      <div className="flex-1">
-        <BomGraph
-          graphNodes={graphNodes}
-          graphEdges={graphEdges}
-          centerNodeId={focusedNode || selectedRoot}
-          onToggle={onToggle}
-          onSelect={onSelect}
-          onDoubleClick={onDoubleClick}
-          onOpenBrowser={onOpenBrowser}
-        />
+      {/* View content */}
+      <div className="flex-1 overflow-hidden">
+        {viewMode === 'graph' && (
+          <BomGraph
+            graphNodes={graphNodes}
+            graphEdges={graphEdges}
+            centerNodeId={focusedNode || selectedRoot}
+            onToggle={onToggle}
+            onSelect={onSelect}
+            onDoubleClick={onDoubleClick}
+            onOpenBrowser={onOpenBrowser}
+          />
+        )}
+        {viewMode === 'sunburst' && (
+          <BomSunburst
+            tree={tree}
+            rootSeq={selectedRoot}
+            onSelect={onSelect}
+            selectedNode={selectedNode}
+          />
+        )}
+        {viewMode === 'table' && (
+          <BomTreeTable
+            tree={tree}
+            rootSeq={selectedRoot}
+            onSelect={onSelect}
+            selectedNode={selectedNode}
+          />
+        )}
       </div>
 
       {/* Panels */}
