@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo } from 'react';
 import {
   getCatalog, updateCatalogItem, getCentralQty, setCentralQty,
   getSerialsAtLocation, addSerialUnits, isItemInLocations, deleteCatalogItem,
-  addCatalogItems, type CatalogItem,
+  addCatalogItems, getLocationInventory, getSerials, type CatalogItem,
 } from '@/lib/warehouse';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
