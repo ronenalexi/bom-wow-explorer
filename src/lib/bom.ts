@@ -15,26 +15,75 @@ export interface BomRow {
 
 export interface TreeData {
   rows: BomRow[];
-  childrenMap: Map<string, BomRow[]>; // parentSeq → children rows
+  childrenMap: Map<string, BomRow[]>;
   rowBySeq: Map<string, BomRow>;
   roots: BomRow[];
-  parentMap: Map<string, string>; // childSeq → parentSeq
+  parentMap: Map<string, string>;
+}
+
+export type BomField = 'Seq' | 'Level' | 'Item' | 'ItemDesc' | 'Parent' | 'ParentDesc' | 'QtyPerParent' | 'CumQty' | 'Path' | 'HasChildren';
+
+export const BOM_FIELDS: BomField[] = ['Seq', 'Level', 'Item', 'ItemDesc', 'Parent', 'ParentDesc', 'QtyPerParent', 'CumQty', 'Path', 'HasChildren'];
+
+export type ColumnMapping = Partial<Record<BomField, string>>;
+
+const FIELD_ALIASES: Record<BomField, string[]> = {
+  Seq: ['seq', 'sequence', 'row', '#', 'line', 'row_number', 'row number', 'no', 'num'],
+  Level: ['level', 'bom level', 'lvl', 'bom_level', 'depth', 'indent'],
+  Item: ['item', 'part', 'part number', 'item_code', 'item code', 'component', 'part_number', 'partno', 'material', 'child', 'child item', 'child_item', 'item_no', 'item no', 'pn', 'sku'],
+  ItemDesc: ['description', 'item desc', 'item_desc', 'desc', 'name', 'item description', 'item_description', 'part description', 'component desc', 'component_desc', 'child desc', 'child_desc'],
+  Parent: ['parent', 'parent item', 'parent_item', 'parent_no', 'parent no', 'assy', 'assembly', 'parent part', 'parent_part'],
+  ParentDesc: ['parent desc', 'parent_desc', 'parent description', 'parent_description', 'assy desc', 'assembly desc'],
+  QtyPerParent: ['qty', 'quantity', 'qty per parent', 'qty_per_parent', 'qty per', 'qty_per', 'qtyper', 'unit qty', 'unit_qty', 'qty/parent'],
+  CumQty: ['cum qty', 'cumulative qty', 'cum_qty', 'extended qty', 'ext qty', 'ext_qty', 'total qty', 'total_qty'],
+  Path: ['path', 'bom path', 'hierarchy', 'bom_path', 'tree path', 'tree_path'],
+  HasChildren: ['has children', 'has_children', 'expandable', 'haschildren', 'is parent', 'is_parent'],
+};
+
+export function parseCSVRaw(csvText: string): { headers: string[]; rawRows: Record<string, string>[] } {
+  const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
+  const headers = result.meta.fields || [];
+  return { headers, rawRows: result.data as Record<string, string>[] };
+}
+
+export function autoMatchHeaders(headers: string[]): ColumnMapping {
+  const mapping: ColumnMapping = {};
+  const usedHeaders = new Set<string>();
+
+  for (const field of BOM_FIELDS) {
+    const aliases = FIELD_ALIASES[field];
+    for (const header of headers) {
+      if (usedHeaders.has(header)) continue;
+      const normalized = header.toLowerCase().trim();
+      if (aliases.includes(normalized)) {
+        mapping[field] = header;
+        usedHeaders.add(header);
+        break;
+      }
+    }
+  }
+  return mapping;
+}
+
+export function mapRows(rawRows: Record<string, string>[], mapping: ColumnMapping): BomRow[] {
+  return rawRows.map((raw, i) => ({
+    Seq: (mapping.Seq ? raw[mapping.Seq]?.toString().trim() : '') || String(i + 1),
+    Level: parseInt(mapping.Level ? raw[mapping.Level] : '') || 0,
+    Item: (mapping.Item ? raw[mapping.Item]?.toString().trim() : '') || '',
+    ItemDesc: (mapping.ItemDesc ? raw[mapping.ItemDesc]?.toString().trim() : '') || '',
+    Parent: (mapping.Parent ? raw[mapping.Parent]?.toString().trim() : '') || '',
+    ParentDesc: (mapping.ParentDesc ? raw[mapping.ParentDesc]?.toString().trim() : '') || '',
+    QtyPerParent: parseFloat(mapping.QtyPerParent ? raw[mapping.QtyPerParent] : '') || 0,
+    CumQty: parseFloat(mapping.CumQty ? raw[mapping.CumQty] : '') || 0,
+    Path: (mapping.Path ? raw[mapping.Path]?.toString().trim() : '') || '',
+    HasChildren: String(mapping.HasChildren ? raw[mapping.HasChildren] : 'false').trim().toLowerCase() === 'true',
+  }));
 }
 
 export function parseCSV(csvText: string): BomRow[] {
-  const result = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-  return result.data.map((row: any, i: number) => ({
-    Seq: row.Seq?.toString().trim() || String(i + 1),
-    Level: parseInt(row.Level) || 0,
-    Item: row.Item?.toString().trim() || '',
-    ItemDesc: row.ItemDesc?.toString().trim() || row.Item_Desc?.toString().trim() || '',
-    Parent: row.Parent?.toString().trim() || '',
-    ParentDesc: row.ParentDesc?.toString().trim() || row.Parent_Desc?.toString().trim() || '',
-    QtyPerParent: parseFloat(row.QtyPerParent) || parseFloat(row.Qty_Per_Parent) || 0,
-    CumQty: parseFloat(row.CumQty) || parseFloat(row.Cum_Qty) || 0,
-    Path: row.Path?.toString().trim() || '',
-    HasChildren: String(row.HasChildren ?? row.Has_Children ?? 'false').trim().toLowerCase() === 'true',
-  }));
+  const { headers, rawRows } = parseCSVRaw(csvText);
+  const mapping = autoMatchHeaders(headers);
+  return mapRows(rawRows, mapping);
 }
 
 export function buildTree(rows: BomRow[]): TreeData {
