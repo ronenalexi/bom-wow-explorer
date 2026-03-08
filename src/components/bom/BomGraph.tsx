@@ -37,11 +37,11 @@ const GraphCtx = createContext<GraphCallbacks>({
 // dagre layout
 function layoutNodes(graphNodes: GraphNode[], graphEdges: GraphEdge[]): { nodes: Node[]; edges: Edge[] } {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 120, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: 'TB', nodesep: 80, ranksep: 140, marginx: 50, marginy: 50 });
 
   for (const n of graphNodes) {
-    const w = n.type === 'item' ? 240 : 180;
-    const h = n.type === 'item' ? 90 : 60;
+    const w = n.type === 'item' ? 260 : 190;
+    const h = n.type === 'item' ? 140 : 70;
     g.setNode(n.id, { width: w, height: h });
   }
   for (const e of graphEdges) {
