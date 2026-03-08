@@ -142,7 +142,7 @@ export default function LocationsManager({ onRefresh, refreshKey }: Props) {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {locations.map(loc => {
+            {filteredLocations.map(loc => {
               const items = getLocationItems(loc.location_id);
               const totalQty = items.reduce((s, i) => s + i.qty, 0);
               return (
