@@ -26,10 +26,9 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Set<string>>(new Set());
   const [selectMode, setSelectMode] = useState(false);
-  const [previewData, setPreviewData] = useState<{ rows: BomRow[]; filename?: string } | null>(null);
+  const [previewRaw, setPreviewRaw] = useState<{ headers: string[]; rawRows: Record<string, string>[]; filename?: string } | null>(null);
+  const [columnMapping, setColumnMapping] = useState<ColumnMapping>({});
   const [previewOpen, setPreviewOpen] = useState(false);
-  const [previewIssues, setPreviewIssues] = useState<string[]>([]);
-  const [fileInfo, setFileInfo] = useState<{ name: string; rowCount: number; loadedAt: string } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   // Build tree from parsed rows
