@@ -40,17 +40,51 @@ export function parseCSV(csvText: string): BomRow[] {
 export function buildTree(rows: BomRow[]): TreeData {
   const rowBySeq = new Map<string, BomRow>();
   const childrenMap = new Map<string, BomRow[]>();
-  const parentMap = new Map<string, string>();
-  const stack: string[] = [];
+  const parentMap = new Map<string, string>(); // childSeq → parentSeq
 
   const minLevel = rows.length > 0 ? Math.min(...rows.map(r => r.Level)) : 0;
 
+  // Index all rows by Seq
   for (const row of rows) {
     rowBySeq.set(row.Seq, row);
-    stack[row.Level] = row.Seq;
+  }
 
-    if (row.Level > minLevel) {
-      const parentSeq = stack[row.Level - 1];
+  // Build a lookup: for each row, track the most recent Seq for each Item at each Level.
+  // This handles duplicate Items across different assemblies by using row order + Level.
+  const lastSeqByItemAtLevel = new Map<string, string>(); // `${Item}@${Level}` → Seq
+
+  for (const row of rows) {
+    lastSeqByItemAtLevel.set(`${row.Item}@${row.Level}`, row.Seq);
+
+    if (row.Level > minLevel && row.Parent) {
+      // Find the parent: look for the most recent row with Item == row.Parent at Level == row.Level - 1
+      // If not found at exact level, search upward or use Path-based matching
+      let parentSeq: string | undefined;
+
+      // Strategy 1: Use Path to find exact parent
+      if (row.Path) {
+        const pathParts = row.Path.split('>').map(s => s.trim());
+        if (pathParts.length >= 2) {
+          const parentItem = pathParts[pathParts.length - 2];
+          // Find the parent row: match Item == parentItem at Level == row.Level - 1
+          parentSeq = lastSeqByItemAtLevel.get(`${parentItem}@${row.Level - 1}`);
+        }
+      }
+
+      // Strategy 2: Fallback to Parent column matching at Level - 1
+      if (!parentSeq) {
+        parentSeq = lastSeqByItemAtLevel.get(`${row.Parent}@${row.Level - 1}`);
+      }
+
+      // Strategy 3: Fallback - find any row with matching Item == Parent that was already processed
+      if (!parentSeq) {
+        for (const [seq, r] of rowBySeq) {
+          if (r.Item === row.Parent && parseInt(seq) < parseInt(row.Seq)) {
+            parentSeq = seq;
+          }
+        }
+      }
+
       if (parentSeq) {
         if (!childrenMap.has(parentSeq)) childrenMap.set(parentSeq, []);
         childrenMap.get(parentSeq)!.push(row);
