@@ -171,16 +171,6 @@ export default function BomSunburst({ tree, rootSeq, onSelect, selectedNode }: P
 
   return (
     <div className="w-full h-full flex items-center justify-center bg-background relative select-none">
-      {/* Back button overlay */}
-      {zoomRoot && (
-        <button
-          onClick={handleBackClick}
-          className="absolute top-4 left-4 z-20 flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-muted hover:bg-muted/80 border border-border text-foreground text-xs font-medium transition-colors"
-        >
-          <Undo2 size={14} />
-          חזרה
-        </button>
-      )}
 
       <svg
         viewBox={viewBox}
