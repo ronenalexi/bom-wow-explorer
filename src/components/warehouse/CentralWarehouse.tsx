@@ -138,6 +138,7 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
               <TableHead>Description</TableHead>
               <TableHead className="w-24 text-center">Serialized</TableHead>
               <TableHead className="w-32 text-center">Qty On Hand</TableHead>
+              <TableHead className="w-24 text-center">Total</TableHead>
               <TableHead className="w-20">Source</TableHead>
               <TableHead className="w-32">Actions</TableHead>
             </TableRow>
