@@ -1,8 +1,9 @@
-import React, { useMemo, useCallback, useEffect, createContext, useContext } from 'react';
+import React, { useMemo, useCallback, useEffect, useState, createContext, useContext } from 'react';
 import {
   ReactFlow,
   Background,
   Controls,
+  ControlButton,
   MiniMap,
   Handle,
   Position,
@@ -17,7 +18,7 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Leaf, MoreHorizontal, Layers } from 'lucide-react';
+import { ChevronDown, ChevronRight, Leaf, MoreHorizontal, Layers, Sun, Moon } from 'lucide-react';
 import type { GraphNode, GraphEdge, BomRow } from '@/lib/bom';
 
 // Context for callbacks
