@@ -194,7 +194,6 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                       {totalQty}
                     </span>
                   </TableCell>
-                  </TableCell>
                   <TableCell>
                     {item.created_from_bom ? (
                       <Badge variant="secondary" className="text-xs">BOM</Badge>
