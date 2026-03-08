@@ -55,6 +55,19 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
     onRefresh();
   }, [addSerialDialog, serialInput, onRefresh]);
 
+  const handleDeleteClick = useCallback((item_code: string) => {
+    const inLocations = isItemInLocations(item_code);
+    setDeleteConfirm({ item_code, inLocations });
+  }, []);
+
+  const handleDeleteConfirm = useCallback(() => {
+    if (!deleteConfirm) return;
+    deleteCatalogItem(deleteConfirm.item_code);
+    toast.success(`Item ${deleteConfirm.item_code} deleted`);
+    setDeleteConfirm(null);
+    onRefresh();
+  }, [deleteConfirm, onRefresh]);
+
   if (catalog.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full p-8">
