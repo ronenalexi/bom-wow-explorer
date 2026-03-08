@@ -99,6 +99,19 @@ export default function LocationsManager({ onRefresh, refreshKey }: Props) {
         <h2 className="font-bold text-foreground text-lg">Locations</h2>
         <Badge variant="secondary">{locations.length}</Badge>
         <div className="flex-1" />
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-36 h-9">
+            <SelectValue placeholder="All Types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {LOCATION_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <div className="relative w-52">
+          <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
+          <Input placeholder="Search locations..." value={locSearch} onChange={e => setLocSearch(e.target.value)} className="pl-8" />
+        </div>
         <Button onClick={() => setAddDialogOpen(true)} className="gap-2">
           <Plus className="w-4 h-4" /> Add Location
         </Button>
