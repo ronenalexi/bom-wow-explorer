@@ -25,6 +25,8 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
   const [addSerialDialog, setAddSerialDialog] = useState<string | null>(null);
   const [serialInput, setSerialInput] = useState('');
   const [deleteConfirm, setDeleteConfirm] = useState<{ item_code: string; inLocations: boolean } | null>(null);
+  const [addItemOpen, setAddItemOpen] = useState(false);
+  const [newItem, setNewItem] = useState({ item_code: '', item_desc: '' });
 
   const catalog = useMemo(() => getCatalog(), [refreshKey]);
 
