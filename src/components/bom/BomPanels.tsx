@@ -69,14 +69,58 @@ export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate
 
         <Separator className="bg-border" />
 
-        <div className="mt-4 space-y-3">
-          {fields.map(f => (
-            <div key={f.label}>
-              <div className="text-[11px] text-muted-foreground uppercase tracking-wider">{f.label}</div>
-              <div className="text-sm text-foreground mt-0.5 font-mono">{f.value || '—'}</div>
-            </div>
-          ))}
-        </div>
+        <ScrollArea className="flex-1 mt-4">
+          <div className="space-y-3">
+            {fields.map(f => (
+              <div key={f.label}>
+                <div className="text-[11px] text-muted-foreground uppercase tracking-wider">{f.label}</div>
+                <div className="text-sm text-foreground mt-0.5 font-mono">{f.value || '—'}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Direct Children List */}
+          {row.HasChildren && selectedSeq && tree && (() => {
+            const directChildren = tree.childrenMap.get(selectedSeq) || [];
+            return directChildren.length > 0 ? (
+              <div className="mt-6">
+                <Separator className="bg-border mb-4" />
+                <div className="flex items-center gap-2 mb-3">
+                  <FolderTree className="w-4 h-4 text-primary" />
+                  <span className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
+                    Direct Children
+                  </span>
+                  <Badge variant="secondary" className="text-[10px]">{directChildren.length}</Badge>
+                </div>
+                <div className="space-y-1">
+                  {directChildren.map(c => (
+                    <button
+                      key={c.Seq}
+                      onClick={() => onNavigate(c.Seq)}
+                      className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md hover:bg-secondary/60 transition-colors text-left group"
+                    >
+                      {c.HasChildren ? (
+                        <FolderTree className="w-3.5 h-3.5 text-primary/70 shrink-0" />
+                      ) : (
+                        <Leaf className="w-3.5 h-3.5 text-node-leaf/70 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-mono text-foreground truncate group-hover:text-primary transition-colors">{c.Item}</div>
+                        <div className="text-[11px] text-muted-foreground truncate">{c.ItemDesc}</div>
+                      </div>
+                      {c.QtyPerParent > 0 && (
+                        <Badge variant="secondary" className="text-[10px] shrink-0 bg-accent/15 text-accent border-accent/20">
+                          x{c.QtyPerParent}
+                        </Badge>
+                      )}
+                      <ChevronRight className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null;
+          })()}
+        </ScrollArea>
       </SheetContent>
     </Sheet>
   );

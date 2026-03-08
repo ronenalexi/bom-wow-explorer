@@ -51,8 +51,8 @@ function layoutNodes(graphNodes: GraphNode[], graphEdges: GraphEdge[]): { nodes:
 
   const nodes: Node[] = graphNodes.map(n => {
     const pos = g.node(n.id);
-    const w = n.type === 'item' ? 240 : 180;
-    const h = n.type === 'item' ? 90 : 60;
+    const w = n.type === 'item' ? 260 : 190;
+    const h = n.type === 'item' ? 140 : 70;
     return {
       id: n.id,
       type: n.type,
