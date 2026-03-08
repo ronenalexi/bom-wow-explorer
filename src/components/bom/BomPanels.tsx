@@ -69,7 +69,7 @@ export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate
 
         <Separator className="bg-border" />
 
-        <ScrollArea className="flex-1 mt-4">
+        <ScrollArea className="flex-1 mt-4 overflow-hidden">
           <div className="space-y-3">
             {fields.map(f => (
               <div key={f.label}>
