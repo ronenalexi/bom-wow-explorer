@@ -2,15 +2,20 @@ import React, { useState, useCallback, useMemo, useRef } from 'react';
 import { parseCSV, parseCSVRaw, autoMatchHeaders, mapRows, buildTree, deriveGraph, expandPathToNode, DEMO_CSV, BOM_FIELDS, type TreeData, type BomRow, type BomField, type ColumnMapping } from '@/lib/bom';
 import { addCatalogItems } from '@/lib/warehouse';
 import BomGraph from './BomGraph';
+import BomSunburst from './BomSunburst';
+import BomTreeTable from './BomTreeTable';
 import { BomSidePanel, BomChildrenBrowser, BomSearchDialog } from './BomPanels';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Upload, Search, ArrowLeft, Zap, FileSpreadsheet, PackagePlus } from 'lucide-react';
+import { Upload, Search, ArrowLeft, Zap, FileSpreadsheet, PackagePlus, Share2, Sun, List } from 'lucide-react';
 import { toast } from 'sonner';
+
+type ViewMode = 'graph' | 'sunburst' | 'table';
 
 interface Props {
   onWarehouseRefresh?: () => void;
