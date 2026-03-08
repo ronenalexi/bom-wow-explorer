@@ -89,6 +89,8 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
       }
       return next;
     });
+    // Auto-center on the toggled node
+    setFocusedNode(seq);
   }, [tree]);
 
   const onSelect = useCallback((seq: string) => { setSelectedNode(seq); }, []);
@@ -302,6 +304,7 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         <BomGraph
           graphNodes={graphNodes}
           graphEdges={graphEdges}
+          centerNodeId={focusedNode || selectedRoot}
           onToggle={onToggle}
           onSelect={onSelect}
           onDoubleClick={onDoubleClick}
