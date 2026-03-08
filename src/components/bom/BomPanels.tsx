@@ -26,6 +26,8 @@ interface SidePanelProps {
 }
 
 export function BomSidePanel({ open, onClose, row, tree, selectedSeq, onNavigate, onWarehouseRefresh }: SidePanelProps) {
+  const [qtyDialogOpen, setQtyDialogOpen] = useState(false);
+  const [addQty, setAddQty] = useState('0');
   const ancestors = useMemo(() => {
     if (!selectedSeq || !tree) return [];
     return getAncestors(tree, selectedSeq);
