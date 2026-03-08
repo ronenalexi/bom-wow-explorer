@@ -3,7 +3,6 @@ import {
   ReactFlow,
   Background,
   Controls,
-  ControlButton,
   MiniMap,
   Handle,
   Position,
@@ -17,8 +16,9 @@ import {
   ConnectionLineType,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
+import Dagre from '@dagrejs/dagre';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Leaf, MoreHorizontal, Layers, Sun, Moon } from 'lucide-react';
+import { ChevronDown, Leaf, MoreHorizontal, Layers, Package } from 'lucide-react';
 import type { GraphNode, GraphEdge, BomRow } from '@/lib/bom';
 
 // Context for callbacks
@@ -35,138 +35,50 @@ const GraphCtx = createContext<GraphCallbacks>({
   onOpenBrowser: () => {},
 });
 
-// ---------- Radial Layout ----------
+// ---------- Dagre Tree Layout ----------
 
-const NODE_WIDTH = 260;
-const NODE_HEIGHT = 140;
-const SMALL_NODE_W = 190;
-const SMALL_NODE_H = 70;
-const MIN_SPACING = 40; // minimum gap between node edges
+const NODE_WIDTH = 240;
+const NODE_HEIGHT = 120;
+const SMALL_NODE_W = 170;
+const SMALL_NODE_H = 60;
 
-function radialLayout(
+function dagreLayout(
   graphNodes: GraphNode[],
   graphEdges: GraphEdge[],
-  centerNodeId: string | null,
 ): { nodes: Node[]; edges: Edge[] } {
   if (graphNodes.length === 0) return { nodes: [], edges: [] };
 
-  const childrenOf = new Map<string, string[]>();
-  const parentOf = new Map<string, string>();
-  for (const e of graphEdges) {
-    if (!childrenOf.has(e.source)) childrenOf.set(e.source, []);
-    childrenOf.get(e.source)!.push(e.target);
-    parentOf.set(e.target, e.source);
-  }
+  const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
+  g.setGraph({
+    rankdir: 'TB',
+    nodesep: 60,
+    ranksep: 100,
+    edgesep: 30,
+    marginx: 40,
+    marginy: 40,
+  });
 
-  let centerId = centerNodeId;
-  if (!centerId || !graphNodes.find(n => n.id === centerId)) {
-    centerId = graphNodes.find(n => !parentOf.has(n.id))?.id || graphNodes[0].id;
-  }
-
-  const positions = new Map<string, { x: number; y: number }>();
-  const nodeAngles = new Map<string, number>();
-  const visited = new Set<string>();
-
-  positions.set(centerId, { x: 0, y: 0 });
-  visited.add(centerId);
-
-  // Place parent of center above
-  const centerParent = parentOf.get(centerId);
-  if (centerParent && graphNodes.find(n => n.id === centerParent)) {
-    positions.set(centerParent, { x: 0, y: -400 });
-    nodeAngles.set(centerParent, -Math.PI / 2);
-    visited.add(centerParent);
-  }
-
-  function computeRadius(childCount: number, depth: number): number {
-    // Ensure nodes don't overlap: circumference must fit all nodes
-    const nodeSize = NODE_WIDTH + MIN_SPACING;
-    const circumferenceNeeded = childCount * nodeSize;
-    const radiusFromCircumference = circumferenceNeeded / (2 * Math.PI);
-    const minRadius = 350 + depth * 80;
-    return Math.max(minRadius, radiusFromCircumference);
-  }
-
-  function placeChildren(parentId: string, depth: number) {
-    const kids = childrenOf.get(parentId) || [];
-    const unvisited = kids.filter(k => !visited.has(k));
-    if (unvisited.length === 0) return;
-
-    const parentPos = positions.get(parentId)!;
-    const radius = computeRadius(unvisited.length, depth);
-    const isCenter = parentId === centerId;
-
-    let baseAngle: number;
-    let spread: number;
-
-    if (isCenter) {
-      if (centerParent && graphNodes.find(n => n.id === centerParent)) {
-        baseAngle = Math.PI / 2;
-        spread = Math.PI * 1.5;
-      } else {
-        baseAngle = -Math.PI / 2;
-        spread = Math.PI * 2;
-      }
-    } else {
-      const grandParent = parentOf.get(parentId);
-      if (grandParent && positions.has(grandParent)) {
-        const gpPos = positions.get(grandParent)!;
-        baseAngle = Math.atan2(parentPos.y - gpPos.y, parentPos.x - gpPos.x);
-      } else {
-        baseAngle = Math.PI / 2;
-      }
-      // Dynamic spread: wider arc for more children, capped at 180 degrees
-      const minArcPerChild = 0.35;
-      spread = Math.min(Math.PI, Math.max(Math.PI * 0.5, unvisited.length * minArcPerChild));
-    }
-
-    for (let i = 0; i < unvisited.length; i++) {
-      const kid = unvisited[i];
-      let angle: number;
-      if (unvisited.length === 1) {
-        angle = baseAngle;
-      } else {
-        angle = baseAngle - spread / 2 + (spread / (unvisited.length - 1)) * i;
-      }
-
-      const x = parentPos.x + radius * Math.cos(angle);
-      const y = parentPos.y + radius * Math.sin(angle);
-
-      positions.set(kid, { x, y });
-      nodeAngles.set(kid, angle);
-      visited.add(kid);
-
-      placeChildren(kid, depth + 1);
-    }
-  }
-
-  placeChildren(centerId, 0);
-
-  // Also place children of centerParent's other branches (siblings of center)
-  if (centerParent && graphNodes.find(n => n.id === centerParent)) {
-    placeChildren(centerParent, 1);
-  }
-
-  // Place any remaining unvisited nodes
-  let offsetX = 0;
   for (const n of graphNodes) {
-    if (!positions.has(n.id)) {
-      positions.set(n.id, { x: offsetX, y: 600 });
-      offsetX += NODE_WIDTH + MIN_SPACING;
-    }
-  }
-
-  const nodes: Node[] = graphNodes.map(n => {
-    const pos = positions.get(n.id)!;
     const w = n.type === 'item' ? NODE_WIDTH : SMALL_NODE_W;
     const h = n.type === 'item' ? NODE_HEIGHT : SMALL_NODE_H;
-    const angle = nodeAngles.get(n.id);
+    g.setNode(n.id, { width: w, height: h });
+  }
 
+  for (const e of graphEdges) {
+    g.setEdge(e.source, e.target);
+  }
+
+  Dagre.layout(g);
+
+  const nodes: Node[] = graphNodes.map(n => {
+    const pos = g.node(n.id);
+    const w = n.type === 'item' ? NODE_WIDTH : SMALL_NODE_W;
+    const h = n.type === 'item' ? NODE_HEIGHT : SMALL_NODE_H;
     return {
       id: n.id,
       type: n.type,
       position: { x: pos.x - w / 2, y: pos.y - h / 2 },
-      data: { ...n.data, angle, isCenter: n.id === centerId },
+      data: n.data,
     };
   });
 
@@ -174,9 +86,9 @@ function radialLayout(
     id: e.id,
     source: e.source,
     target: e.target,
-    type: 'default',
+    type: 'smoothstep',
     animated: false,
-    style: { stroke: 'hsl(185 80% 40% / 0.4)', strokeWidth: 2 },
+    style: { stroke: 'hsl(var(--primary) / 0.35)', strokeWidth: 2 },
   }));
 
   return { nodes, edges };
@@ -184,91 +96,82 @@ function radialLayout(
 
 // ---------- Custom Nodes ----------
 
-function ItemNode({ id, data }: { id: string; data: { row: BomRow; isExpanded: boolean; isCenter?: boolean } }) {
+function ItemNode({ id, data }: { id: string; data: { row: BomRow; isExpanded: boolean } }) {
   const { onToggle, onSelect, onDoubleClick } = useContext(GraphCtx);
-  const { row, isExpanded, isCenter } = data;
+  const { row, isExpanded } = data;
   const isRoot = row.Level === 0 || !row.Parent;
   const isLeaf = !row.HasChildren;
 
   return (
     <div
-      className="bom-node-wrapper cursor-pointer"
+      className="cursor-pointer group"
       onClick={() => onSelect(id)}
       onDoubleClick={() => onDoubleClick(id)}
     >
-      {/* All 4 handles for radial connections */}
-      <Handle type="target" position={Position.Top} className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <Handle type="target" position={Position.Left} id="left-t" className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <Handle type="target" position={Position.Right} id="right-t" className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <Handle type="target" position={Position.Bottom} id="bottom-t" className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
+      <Handle type="target" position={Position.Top} className="!bg-primary/40 !border-primary/20 !w-2 !h-2" />
 
       <div className={`
-        w-[260px] rounded-xl border p-4 transition-all duration-300
-        ${isCenter
-          ? 'bg-gradient-to-br from-primary/20 to-card border-primary/60 shadow-[0_0_30px_hsl(185_100%_48%/0.2)] scale-105'
-          : isRoot
-            ? 'bg-gradient-to-br from-card to-secondary border-primary/40 shadow-lg'
-            : isLeaf
-              ? 'bg-card/80 border-node-leaf/30 hover:border-node-leaf/60'
-              : 'bg-card border-border hover:border-primary/50'
+        w-[240px] rounded-lg border transition-all duration-200
+        ${isRoot
+          ? 'bg-primary/10 border-primary/40 shadow-md shadow-primary/10'
+          : isLeaf
+            ? 'bg-card border-border/60 group-hover:border-muted-foreground/40'
+            : 'bg-card border-border group-hover:border-primary/40 shadow-sm'
         }
       `}>
-        <div className="flex items-center gap-2 mb-2">
-          <div className={`
-            w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold
-            ${isRoot || isCenter
-              ? 'bg-primary/20 text-primary'
-              : isLeaf
-                ? 'bg-node-leaf/15 text-node-leaf'
-                : 'bg-secondary text-muted-foreground'
-            }
-          `}>
-            L{row.Level}
-          </div>
-          <div className="flex-1" />
-          {row.QtyPerParent > 0 && (
-            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-accent/20 text-accent border-accent/30 font-bold">
-              ×{row.QtyPerParent}
-            </Badge>
-          )}
-        </div>
-
-        <div className={`font-mono text-sm font-bold truncate ${isRoot || isCenter ? 'text-primary' : 'text-foreground'}`}>
-          {row.Item}
-        </div>
-        <div className="text-xs text-muted-foreground truncate mt-1">{row.ItemDesc}</div>
-
-        <div className="mt-3 pt-2 border-t border-border/50">
-          {row.HasChildren ? (
-            <button
-              onClick={(e) => { e.stopPropagation(); onToggle(id); }}
-              className={`
-                flex items-center gap-1.5 text-[11px] font-medium transition-all duration-200
-                ${isExpanded ? 'text-primary' : 'text-primary/60 hover:text-primary'}
-              `}
-            >
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 ${
-                isExpanded ? 'bg-primary/20 rotate-0' : 'bg-primary/10 -rotate-90'
-              }`}>
-                <ChevronDown className="w-3 h-3" />
-              </div>
-              {isExpanded ? 'Collapse' : 'Expand children'}
-            </button>
-          ) : (
-            <div className="flex items-center gap-1.5 text-[11px] text-node-leaf/70">
-              <div className="w-5 h-5 rounded-full bg-node-leaf/10 flex items-center justify-center">
-                <Leaf className="w-3 h-3" />
-              </div>
-              <span>Leaf component</span>
+        {/* Header */}
+        <div className={`px-3 py-2 border-b ${isRoot ? 'border-primary/20' : 'border-border/40'}`}>
+          <div className="flex items-center gap-2">
+            <div className={`
+              w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold shrink-0
+              ${isRoot
+                ? 'bg-primary/20 text-primary'
+                : isLeaf
+                  ? 'bg-muted text-muted-foreground'
+                  : 'bg-secondary text-secondary-foreground'
+              }
+            `}>
+              {row.Level}
             </div>
-          )}
+            <span className={`font-mono text-xs font-semibold truncate ${isRoot ? 'text-primary' : 'text-foreground'}`}>
+              {row.Item}
+            </span>
+            {row.QtyPerParent > 0 && (
+              <Badge variant="secondary" className="text-[9px] px-1 py-0 ml-auto shrink-0 bg-accent/15 text-accent border-accent/20 font-bold">
+                ×{row.QtyPerParent}
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-3 py-2">
+          <p className="text-[11px] text-muted-foreground truncate leading-tight">{row.ItemDesc}</p>
+
+          {/* Expand / Leaf indicator */}
+          <div className="mt-2">
+            {row.HasChildren ? (
+              <button
+                onClick={(e) => { e.stopPropagation(); onToggle(id); }}
+                className={`
+                  flex items-center gap-1.5 text-[10px] font-medium transition-colors
+                  ${isExpanded ? 'text-primary' : 'text-muted-foreground hover:text-primary'}
+                `}
+              >
+                <ChevronDown className={`w-3 h-3 transition-transform duration-200 ${isExpanded ? '' : '-rotate-90'}`} />
+                {isExpanded ? 'Collapse' : 'Expand'}
+              </button>
+            ) : (
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground/60">
+                <Leaf className="w-3 h-3" />
+                <span>Leaf</span>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
-      <Handle type="source" position={Position.Bottom} className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <Handle type="source" position={Position.Left} id="left-s" className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <Handle type="source" position={Position.Right} id="right-s" className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <Handle type="source" position={Position.Top} id="top-s" className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} className="!bg-primary/40 !border-primary/20 !w-2 !h-2" />
     </div>
   );
 }
@@ -276,13 +179,11 @@ function ItemNode({ id, data }: { id: string; data: { row: BomRow; isExpanded: b
 function MoreNode({ id, data }: { id: string; data: { count: number; parentSeq: string } }) {
   const { onOpenBrowser } = useContext(GraphCtx);
   return (
-    <div className="bom-node-wrapper">
-      <Handle type="target" position={Position.Top} className="!bg-accent/50 !border-accent/30 !w-2 !h-2" />
-      <Handle type="target" position={Position.Left} id="left-t" className="!bg-accent/50 !border-accent/30 !w-2 !h-2" />
-      <Handle type="target" position={Position.Right} id="right-t" className="!bg-accent/50 !border-accent/30 !w-2 !h-2" />
+    <div>
+      <Handle type="target" position={Position.Top} className="!bg-accent/40 !border-accent/20 !w-2 !h-2" />
       <button
         onClick={() => onOpenBrowser(data.parentSeq)}
-        className="w-[180px] rounded-lg border border-accent/30 bg-accent/10 p-3 text-center hover:bg-accent/20 transition-colors"
+        className="w-[170px] rounded-lg border border-accent/30 bg-accent/5 p-3 text-center hover:bg-accent/15 transition-colors"
       >
         <MoreHorizontal className="w-4 h-4 mx-auto text-accent mb-1" />
         <div className="text-xs font-medium text-accent">+{data.count} more</div>
@@ -295,17 +196,15 @@ function MoreNode({ id, data }: { id: string; data: { count: number; parentSeq: 
 function ChildrenGroupNode({ id, data }: { id: string; data: { count: number; parentSeq: string } }) {
   const { onOpenBrowser } = useContext(GraphCtx);
   return (
-    <div className="bom-node-wrapper">
-      <Handle type="target" position={Position.Top} className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <Handle type="target" position={Position.Left} id="left-t" className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <Handle type="target" position={Position.Right} id="right-t" className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
+    <div>
+      <Handle type="target" position={Position.Top} className="!bg-primary/40 !border-primary/20 !w-2 !h-2" />
       <button
         onClick={() => onOpenBrowser(data.parentSeq)}
-        className="w-[180px] rounded-lg border border-primary/30 bg-primary/10 p-3 text-center hover:bg-primary/20 transition-colors animate-pulse-glow"
+        className="w-[170px] rounded-lg border border-primary/30 bg-primary/5 p-3 text-center hover:bg-primary/15 transition-colors"
       >
-        <Layers className="w-5 h-5 mx-auto text-primary mb-1" />
+        <Layers className="w-4 h-4 mx-auto text-primary mb-1" />
         <div className="text-sm font-bold text-primary">{data.count} Children</div>
-        <div className="text-[10px] text-muted-foreground">Click to browse all</div>
+        <div className="text-[10px] text-muted-foreground">Click to browse</div>
       </button>
     </div>
   );
@@ -328,28 +227,13 @@ function BomGraphInner({ graphNodes, graphEdges, centerNodeId, callbacks }: BomG
   const { fitView } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
-  const [isDark, setIsDark] = useState(() => !document.documentElement.classList.contains('light'));
-
-  const toggleTheme = useCallback(() => {
-    setIsDark(prev => {
-      const next = !prev;
-      if (next) {
-        document.documentElement.classList.remove('light');
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-        document.documentElement.classList.add('light');
-      }
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
-    const { nodes: ln, edges: le } = radialLayout(graphNodes, graphEdges, centerNodeId);
+    const { nodes: ln, edges: le } = dagreLayout(graphNodes, graphEdges);
     setNodes(ln);
     setEdges(le);
-    setTimeout(() => fitView({ padding: 0.2, duration: 600 }), 50);
-  }, [graphNodes, graphEdges, centerNodeId, setNodes, setEdges, fitView]);
+    setTimeout(() => fitView({ padding: 0.15, duration: 400 }), 50);
+  }, [graphNodes, graphEdges, setNodes, setEdges, fitView]);
 
   return (
     <GraphCtx.Provider value={callbacks}>
@@ -365,20 +249,18 @@ function BomGraphInner({ graphNodes, graphEdges, centerNodeId, callbacks }: BomG
         maxZoom={2}
         defaultEdgeOptions={{ animated: false }}
         connectionLineType={ConnectionLineType.SmoothStep}
+        proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(222 15% 15%)" />
-        <Controls>
-          <ControlButton onClick={toggleTheme} title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
-            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          </ControlButton>
-        </Controls>
+        <Background variant={BackgroundVariant.Dots} gap={24} size={1} color="hsl(var(--muted-foreground) / 0.15)" />
+        <Controls showInteractive={false} />
         <MiniMap
           nodeColor={(n) => {
-            if (n.type === 'more') return 'hsl(38 95% 55%)';
-            if (n.type === 'children-group') return 'hsl(185 100% 48%)';
-            return 'hsl(222 20% 25%)';
+            if (n.type === 'more') return 'hsl(var(--accent))';
+            if (n.type === 'children-group') return 'hsl(var(--primary))';
+            return 'hsl(var(--muted-foreground) / 0.3)';
           }}
-          maskColor="hsl(222 25% 6% / 0.8)"
+          maskColor="hsl(var(--background) / 0.85)"
+          className="!bg-card !border-border"
         />
       </ReactFlow>
     </GraphCtx.Provider>
