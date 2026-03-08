@@ -37,11 +37,11 @@ const GraphCtx = createContext<GraphCallbacks>({
 // dagre layout
 function layoutNodes(graphNodes: GraphNode[], graphEdges: GraphEdge[]): { nodes: Node[]; edges: Edge[] } {
   const g = new Dagre.graphlib.Graph().setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'TB', nodesep: 60, ranksep: 120, marginx: 40, marginy: 40 });
+  g.setGraph({ rankdir: 'TB', nodesep: 80, ranksep: 140, marginx: 50, marginy: 50 });
 
   for (const n of graphNodes) {
-    const w = n.type === 'item' ? 240 : 180;
-    const h = n.type === 'item' ? 90 : 60;
+    const w = n.type === 'item' ? 260 : 190;
+    const h = n.type === 'item' ? 140 : 70;
     g.setNode(n.id, { width: w, height: h });
   }
   for (const e of graphEdges) {
@@ -51,8 +51,8 @@ function layoutNodes(graphNodes: GraphNode[], graphEdges: GraphEdge[]): { nodes:
 
   const nodes: Node[] = graphNodes.map(n => {
     const pos = g.node(n.id);
-    const w = n.type === 'item' ? 240 : 180;
-    const h = n.type === 'item' ? 90 : 60;
+    const w = n.type === 'item' ? 260 : 190;
+    const h = n.type === 'item' ? 140 : 70;
     return {
       id: n.id,
       type: n.type,
@@ -66,7 +66,8 @@ function layoutNodes(graphNodes: GraphNode[], graphEdges: GraphEdge[]): { nodes:
     source: e.source,
     target: e.target,
     animated: true,
-    style: { stroke: 'hsl(185 80% 40% / 0.6)', strokeWidth: 2 },
+    type: 'smoothstep',
+    style: { stroke: 'hsl(185 80% 40% / 0.5)', strokeWidth: 2 },
   }));
 
   return { nodes, edges };
@@ -76,6 +77,8 @@ function layoutNodes(graphNodes: GraphNode[], graphEdges: GraphEdge[]): { nodes:
 function ItemNode({ id, data }: { id: string; data: { row: BomRow; isExpanded: boolean } }) {
   const { onToggle, onSelect, onDoubleClick } = useContext(GraphCtx);
   const { row, isExpanded } = data;
+  const isRoot = row.Level === 0 || !row.Parent;
+  const isLeaf = !row.HasChildren;
 
   return (
     <div
@@ -83,36 +86,74 @@ function ItemNode({ id, data }: { id: string; data: { row: BomRow; isExpanded: b
       onClick={() => onSelect(id)}
       onDoubleClick={() => onDoubleClick(id)}
     >
-      <Handle type="target" position={Position.Top} className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
-      <div className="w-[240px] rounded-lg border border-border bg-card p-3 glow-node hover:glow-primary transition-shadow duration-300">
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex-1 min-w-0">
-            <div className="font-mono text-sm font-bold text-primary truncate">{row.Item}</div>
-            <div className="text-xs text-muted-foreground truncate mt-0.5">{row.ItemDesc}</div>
+      <Handle type="target" position={Position.Top} className="!bg-primary/50 !border-primary/30 !w-2.5 !h-2.5" />
+      <div className={`
+        w-[260px] rounded-xl border p-4 transition-all duration-300
+        ${isRoot
+          ? 'bg-gradient-to-br from-card to-secondary border-primary/40 glow-primary shadow-lg'
+          : isLeaf
+            ? 'bg-card/80 border-node-leaf/30 hover:border-node-leaf/60 hover:shadow-[0_0_20px_hsl(142_70%_45%/0.15)]'
+            : 'bg-card border-border hover:border-primary/50 hover:glow-node'
+        }
+      `}>
+        {/* Header with level indicator */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className={`
+            w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold
+            ${isRoot
+              ? 'bg-primary/20 text-primary'
+              : isLeaf
+                ? 'bg-node-leaf/15 text-node-leaf'
+                : 'bg-secondary text-muted-foreground'
+            }
+          `}>
+            L{row.Level}
           </div>
-          <div className="flex items-center gap-1 shrink-0">
-            {row.QtyPerParent > 0 && (
-              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-accent/20 text-accent border-accent/30">
-                x{row.QtyPerParent}
-              </Badge>
-            )}
-          </div>
+          <div className="flex-1" />
+          {row.QtyPerParent > 0 && (
+            <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-accent/20 text-accent border-accent/30 font-bold">
+              ×{row.QtyPerParent}
+            </Badge>
+          )}
         </div>
-        {row.HasChildren ? (
-          <button
-            onClick={(e) => { e.stopPropagation(); onToggle(id); }}
-            className="mt-2 flex items-center gap-1 text-[11px] text-primary/70 hover:text-primary transition-colors"
-          >
-            {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            {isExpanded ? 'Collapse' : 'Expand'}
-          </button>
-        ) : (
-          <div className="mt-2 flex items-center gap-1 text-[11px] text-node-leaf/70">
-            <Leaf className="w-3 h-3" /> Leaf
-          </div>
-        )}
+
+        {/* Item code */}
+        <div className={`font-mono text-sm font-bold truncate ${isRoot ? 'text-primary' : 'text-foreground'}`}>
+          {row.Item}
+        </div>
+        <div className="text-xs text-muted-foreground truncate mt-1">{row.ItemDesc}</div>
+
+        {/* Expand / Leaf indicator */}
+        <div className="mt-3 pt-2 border-t border-border/50">
+          {row.HasChildren ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onToggle(id); }}
+              className={`
+                flex items-center gap-1.5 text-[11px] font-medium transition-all duration-200
+                ${isExpanded
+                  ? 'text-primary'
+                  : 'text-primary/60 hover:text-primary'
+                }
+              `}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all duration-300 ${
+                isExpanded ? 'bg-primary/20 rotate-0' : 'bg-primary/10 -rotate-90'
+              }`}>
+                <ChevronDown className="w-3 h-3" />
+              </div>
+              {isExpanded ? 'Collapse' : 'Expand children'}
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[11px] text-node-leaf/70">
+              <div className="w-5 h-5 rounded-full bg-node-leaf/10 flex items-center justify-center">
+                <Leaf className="w-3 h-3" />
+              </div>
+              <span>Leaf component</span>
+            </div>
+          )}
+        </div>
       </div>
-      <Handle type="source" position={Position.Bottom} className="!bg-primary/50 !border-primary/30 !w-2 !h-2" />
+      <Handle type="source" position={Position.Bottom} className="!bg-primary/50 !border-primary/30 !w-2.5 !h-2.5" />
     </div>
   );
 }
