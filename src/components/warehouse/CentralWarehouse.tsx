@@ -205,6 +205,26 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirm?.inLocations
+                ? `⚠️ Item "${deleteConfirm.item_code}" is currently assigned to one or more locations. Deleting it will remove it from all locations as well. Are you sure?`
+                : `Are you sure you want to delete "${deleteConfirm?.item_code}" from the catalog?`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
