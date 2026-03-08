@@ -577,6 +577,7 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         tree={tree}
         selectedSeq={selectedNode}
         onNavigate={onBreadcrumbNavigate}
+        onWarehouseRefresh={onWarehouseRefresh}
       />
 
       <BomChildrenBrowser
