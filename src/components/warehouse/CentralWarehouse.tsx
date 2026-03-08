@@ -245,6 +245,31 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {/* Add Item Dialog */}
+      <Dialog open={addItemOpen} onOpenChange={(open) => { setAddItemOpen(open); if (!open) setNewItem({ item_code: '', item_desc: '' }); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <PlusCircle className="w-4 h-4" /> Add New Item
+            </DialogTitle>
+            <DialogDescription>Add a new item manually to the catalog.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="new-item-code">Item Code</Label>
+              <Input id="new-item-code" placeholder="e.g. CABLE-HDMI-2M" value={newItem.item_code} onChange={e => setNewItem(p => ({ ...p, item_code: e.target.value }))} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="new-item-desc">Description</Label>
+              <Input id="new-item-desc" placeholder="e.g. HDMI Cable 2 meters" value={newItem.item_desc} onChange={e => setNewItem(p => ({ ...p, item_desc: e.target.value }))} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setAddItemOpen(false); setNewItem({ item_code: '', item_desc: '' }); }}>Cancel</Button>
+            <Button onClick={handleAddItem}>Add Item</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
