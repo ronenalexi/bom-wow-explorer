@@ -193,6 +193,14 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                 <TableRow key={item.item_code}>
                   <TableCell className="font-mono font-bold text-foreground">{item.item_code}</TableCell>
                   <TableCell className="text-muted-foreground">{item.item_desc}</TableCell>
+                  <TableCell>
+                    <Input
+                      className="h-7 text-xs w-24"
+                      placeholder="—"
+                      value={item.category}
+                      onChange={e => { updateCatalogItem(item.item_code, { category: e.target.value }); onRefresh(); }}
+                    />
+                  </TableCell>
                   <TableCell className="text-center">
                     <Checkbox
                       checked={item.is_serialized}
