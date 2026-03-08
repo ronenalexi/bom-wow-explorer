@@ -22,6 +22,7 @@ interface Props {
 }
 
 export default function BomExplorer({ onWarehouseRefresh }: Props) {
+  const [viewMode, setViewMode] = useState<ViewMode>('graph');
   const [tree, setTree] = useState<TreeData | null>(null);
   const [selectedRoot, setSelectedRoot] = useState<string>('');
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
