@@ -31,7 +31,7 @@ const FIELD_ALIASES: Record<BomField, string[]> = {
   Seq: ['seq', 'sequence', 'row', '#', 'line', 'row_number', 'row number', 'no', 'num'],
   Level: ['level', 'bom level', 'lvl', 'bom_level', 'depth', 'indent'],
   Item: ['item', 'part', 'part number', 'item_code', 'item code', 'component', 'part_number', 'partno', 'material', 'child', 'child item', 'child_item', 'item_no', 'item no', 'pn', 'sku'],
-  ItemDesc: ['description', 'item desc', 'item_desc', 'desc', 'name', 'item description', 'item_description', 'part description', 'component desc', 'component_desc', 'child desc', 'child_desc'],
+  ItemDesc: ['description', 'item desc', 'item_desc', 'desc', 'name', 'item description', 'item_description', 'part description', 'component desc', 'component_desc', 'child desc', 'child_desc', 'item name', 'item_name', 'part name', 'part_name', 'component name', 'component_name', 'material description', 'material_description', 'mat desc', 'mat_desc', 'תיאור', 'תיאור פריט', 'שם פריט'],
   Parent: ['parent', 'parent item', 'parent_item', 'parent_no', 'parent no', 'assy', 'assembly', 'parent part', 'parent_part'],
   ParentDesc: ['parent desc', 'parent_desc', 'parent description', 'parent_description', 'assy desc', 'assembly desc'],
   QtyPerParent: ['qty', 'quantity', 'qty per parent', 'qty_per_parent', 'qty per', 'qty_per', 'qtyper', 'unit qty', 'unit_qty', 'qty/parent'],
