@@ -143,12 +143,29 @@ export function getSerialsAtLocation(item_code: string, location_id: string): Se
   return getSerials().filter(u => u.item_code === item_code && u.current_location_id === location_id);
 }
 
-export function moveSerials(serialIds: string[], toLocationId: string) {
+export function moveSerials(serialIds: string[], toLocationId: string, fromName?: string, toName?: string) {
   const units = getSerials();
+  const movedSerials: string[] = [];
   for (const u of units) {
-    if (serialIds.includes(u.serial_id)) u.current_location_id = toLocationId;
+    if (serialIds.includes(u.serial_id)) {
+      if (!fromName) fromName = u.current_location_id === 'CENTRAL' ? 'Central' : u.current_location_id;
+      movedSerials.push(u.serial_number);
+      u.current_location_id = toLocationId;
+    }
   }
   saveSerials(units);
+  if (movedSerials.length > 0) {
+    import('./warehouseHistory').then(({ addTransferLogEntry }) => {
+      addTransferLogEntry({
+        item_code: units.find(u => serialIds.includes(u.serial_id))?.item_code || '',
+        qty: movedSerials.length,
+        from: fromName || 'Central',
+        to: toName || toLocationId,
+        type: 'serial',
+        serial_numbers: movedSerials,
+      });
+    });
+  }
 }
 
 // ── Locations ──
