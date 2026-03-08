@@ -35,7 +35,7 @@ const FIELD_ALIASES: Record<BomField, string[]> = {
   Parent: ['parent', 'parent item', 'parent_item', 'parent_no', 'parent no', 'assy', 'assembly', 'parent part', 'parent_part'],
   ParentDesc: ['parent desc', 'parent_desc', 'parentdesc', 'parent description', 'parent_description', 'assy desc', 'assembly desc'],
   QtyPerParent: ['qty', 'quantity', 'qty per parent', 'qty_per_parent', 'qty per', 'qty_per', 'qtyper', 'unit qty', 'unit_qty', 'qty/parent'],
-  CumQty: ['cum qty', 'cumulative qty', 'cum_qty', 'extended qty', 'ext qty', 'ext_qty', 'total qty', 'total_qty'],
+  CumQty: ['cum qty', 'cumqty', 'cumulative qty', 'cum_qty', 'extended qty', 'ext qty', 'ext_qty', 'total qty', 'total_qty'],
   Path: ['path', 'bom path', 'hierarchy', 'bom_path', 'tree path', 'tree_path'],
   HasChildren: ['has children', 'has_children', 'expandable', 'haschildren', 'is parent', 'is_parent'],
 };
