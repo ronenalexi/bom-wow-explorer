@@ -216,26 +216,8 @@ export function deriveGraph(
     }
   }
 
-  if (focusedNode) {
-    const row = tree.rowBySeq.get(focusedNode);
-    if (!row) return { nodes, edges };
-
-    const pSeq = tree.parentMap.get(focusedNode);
-    if (pSeq) {
-      const pRow = tree.rowBySeq.get(pSeq);
-      if (pRow) {
-        nodes.push({ id: pSeq, type: 'item', data: { row: pRow, isExpanded: false } });
-        edges.push({ id: `e-${pSeq}-${focusedNode}`, source: pSeq, target: focusedNode });
-      }
-    }
-    visited.add(focusedNode);
-    nodes.push({ id: focusedNode, type: 'item', data: { row, isExpanded: expandedNodes.has(focusedNode) } });
-    if (expandedNodes.has(focusedNode)) {
-      addChildren(focusedNode);
-    }
-  } else {
-    addNode(rootSeq, null);
-  }
+  // Always walk full tree from root; focusedNode is only a layout hint
+  addNode(rootSeq, null);
 
   return { nodes, edges };
 }

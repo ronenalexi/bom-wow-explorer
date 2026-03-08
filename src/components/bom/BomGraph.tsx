@@ -328,6 +328,21 @@ function BomGraphInner({ graphNodes, graphEdges, centerNodeId, callbacks }: BomG
   const { fitView } = useReactFlow();
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [isDark, setIsDark] = useState(() => !document.documentElement.classList.contains('light'));
+
+  const toggleTheme = useCallback(() => {
+    setIsDark(prev => {
+      const next = !prev;
+      if (next) {
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+      }
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     const { nodes: ln, edges: le } = radialLayout(graphNodes, graphEdges, centerNodeId);
@@ -352,7 +367,11 @@ function BomGraphInner({ graphNodes, graphEdges, centerNodeId, callbacks }: BomG
         connectionLineType={ConnectionLineType.SmoothStep}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} color="hsl(222 15% 15%)" />
-        <Controls />
+        <Controls>
+          <ControlButton onClick={toggleTheme} title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+          </ControlButton>
+        </Controls>
         <MiniMap
           nodeColor={(n) => {
             if (n.type === 'more') return 'hsl(38 95% 55%)';
