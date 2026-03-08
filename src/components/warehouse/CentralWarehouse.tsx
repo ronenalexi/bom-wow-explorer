@@ -125,6 +125,9 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
           <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
           <Input placeholder="Search items..." value={search} onChange={e => setSearch(e.target.value)} className="pl-8" />
         </div>
+        <Button size="sm" className="gap-1.5" onClick={() => setAddItemOpen(true)}>
+          <PlusCircle className="w-4 h-4" /> Add Item
+        </Button>
       </div>
 
       <div className="flex-1 overflow-auto p-4">
