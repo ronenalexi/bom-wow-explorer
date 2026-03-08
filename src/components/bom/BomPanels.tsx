@@ -10,7 +10,8 @@ import { Separator } from '@/components/ui/separator';
 import { ChevronRight, Search, ArrowUpDown, Leaf, FolderTree, X, PackagePlus } from 'lucide-react';
 import type { BomRow, TreeData } from '@/lib/bom';
 import { getAncestors } from '@/lib/bom';
-import { addCatalogItems, getCatalog } from '@/lib/warehouse';
+import { addCatalogItems, getCatalog, setCentralQty, getCentralQty } from '@/lib/warehouse';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 
 // --- Side Panel ---
