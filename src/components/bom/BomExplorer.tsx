@@ -414,82 +414,110 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
         onSelect={onSearchSelect}
       />
 
-      {/* CSV preview dialog */}
+      {/* CSV preview dialog with column mapping */}
       <Dialog
         open={previewOpen}
         onOpenChange={(open) => {
           setPreviewOpen(open);
           if (!open) {
-            setPreviewData(null);
-            setPreviewIssues([]);
+            setPreviewRaw(null);
+            setColumnMapping({});
           }
         }}
       >
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Review CSV before import</DialogTitle>
+            <DialogTitle>Map CSV Columns</DialogTitle>
             <DialogDescription>
-              Check that the columns look correct before building the BOM graph.
+              Match your CSV headers to BOM fields. At minimum, map the "Item" field.
             </DialogDescription>
           </DialogHeader>
 
-          {previewData && (
-            <div className="space-y-3">
+          {previewRaw && (
+            <div className="space-y-4">
               <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                {previewData.filename && (
-                  <span className="max-w-[220px] truncate" title={previewData.filename}>
-                    File: <span className="font-mono text-foreground">{previewData.filename}</span>
+                {previewRaw.filename && (
+                  <span className="max-w-[220px] truncate" title={previewRaw.filename}>
+                    File: <span className="font-mono text-foreground">{previewRaw.filename}</span>
                   </span>
                 )}
-                <span>{previewData.rows.length} data rows</span>
+                <span>{previewRaw.rawRows.length} data rows</span>
+                <span>• {previewRaw.headers.length} columns</span>
               </div>
 
-              {previewIssues.length > 0 && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive space-y-1">
-                  <p className="font-medium">Some required BOM fields look empty.</p>
-                  <p>
-                    Missing data for: {previewIssues.join(', ')}. Please check that your CSV includes these columns
-                    (case-insensitive) before continuing.
-                  </p>
+              {/* Column mapping grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {BOM_FIELDS.map(field => (
+                  <div key={field} className="space-y-1">
+                    <label className="text-xs font-medium text-foreground">
+                      {field}
+                      {field === 'Item' && <span className="text-destructive ml-0.5">*</span>}
+                    </label>
+                    <Select
+                      value={columnMapping[field] || '__none__'}
+                      onValueChange={(val) => {
+                        setColumnMapping(prev => {
+                          const next = { ...prev };
+                          if (val === '__none__') {
+                            delete next[field];
+                          } else {
+                            next[field] = val;
+                          }
+                          return next;
+                        });
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs">
+                        <SelectValue placeholder="— skip —" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">— skip —</SelectItem>
+                        {previewRaw.headers.map(h => (
+                          <SelectItem key={h} value={h}>{h}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ))}
+              </div>
+
+              {!mappingHasItem && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">
+                  <p className="font-medium">Map at least the "Item" column to continue.</p>
                 </div>
               )}
 
-              <div className="border rounded-md max-h-64 overflow-auto">
+              {/* Live preview table */}
+              <div className="border rounded-md max-h-48 overflow-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-16">Seq</TableHead>
-                      <TableHead className="w-16">Level</TableHead>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Parent</TableHead>
-                      <TableHead>Parent Desc</TableHead>
-                      <TableHead className="w-24">Qty/Parent</TableHead>
-                      <TableHead className="w-24">Cum Qty</TableHead>
-                      <TableHead>Path</TableHead>
-                      <TableHead className="w-20">HasChildren</TableHead>
+                      <TableHead className="w-16 text-xs">Seq</TableHead>
+                      <TableHead className="w-16 text-xs">Level</TableHead>
+                      <TableHead className="text-xs">Item</TableHead>
+                      <TableHead className="text-xs">Description</TableHead>
+                      <TableHead className="text-xs">Parent</TableHead>
+                      <TableHead className="text-xs">Qty</TableHead>
+                      <TableHead className="text-xs">Path</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {previewData.rows.slice(0, 8).map(row => (
-                      <TableRow key={row.Seq}>
+                    {previewMappedRows.map((row, i) => (
+                      <TableRow key={i}>
                         <TableCell className="font-mono text-xs">{row.Seq}</TableCell>
                         <TableCell className="text-xs">{row.Level}</TableCell>
                         <TableCell className="font-mono text-xs">{row.Item}</TableCell>
                         <TableCell className="text-xs text-muted-foreground">{row.ItemDesc}</TableCell>
                         <TableCell className="font-mono text-xs">{row.Parent}</TableCell>
-                        <TableCell className="text-xs text-muted-foreground">{row.ParentDesc}</TableCell>
                         <TableCell className="text-xs">{row.QtyPerParent}</TableCell>
-                        <TableCell className="text-xs">{row.CumQty}</TableCell>
                         <TableCell className="text-[10px] text-muted-foreground">{row.Path}</TableCell>
-                        <TableCell className="text-xs">{row.HasChildren ? 'true' : 'false'}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Showing up to 8 example rows. If everything looks good, continue to build the interactive BOM graph.
+                Live preview of first 8 rows with current mapping. Adjust dropdowns above if data looks wrong.
               </p>
             </div>
           )}
@@ -500,21 +528,22 @@ export default function BomExplorer({ onWarehouseRefresh }: Props) {
               type="button"
               onClick={() => {
                 setPreviewOpen(false);
-                setPreviewData(null);
-                setPreviewIssues([]);
+                setPreviewRaw(null);
+                setColumnMapping({});
               }}
             >
               Cancel
             </Button>
             <Button
               type="button"
-              disabled={!previewData || previewIssues.length > 0}
+              disabled={!previewRaw || !mappingHasItem}
               onClick={() => {
-                if (!previewData) return;
-                buildFromRows(previewData.rows, { filename: previewData.filename });
+                if (!previewRaw) return;
+                const rows = mapRows(previewRaw.rawRows, columnMapping);
+                buildFromRows(rows, { filename: previewRaw.filename });
                 setPreviewOpen(false);
-                setPreviewData(null);
-                setPreviewIssues([]);
+                setPreviewRaw(null);
+                setColumnMapping({});
               }}
             >
               Use this file
