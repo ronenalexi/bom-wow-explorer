@@ -15,6 +15,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Search, Plus, Package, Hash, Trash2, PlusCircle, Tag } from 'lucide-react';
 import { toast } from 'sonner';
 import { Label } from '@/components/ui/label';
+import BulkActionsBar from './BulkActionsBar';
 
 interface Props {
   onRefresh: () => void;
@@ -29,6 +30,7 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
   const [deleteConfirm, setDeleteConfirm] = useState<{ item_code: string; inLocations: boolean } | null>(null);
   const [addItemOpen, setAddItemOpen] = useState(false);
   const [newItem, setNewItem] = useState({ item_code: '', item_desc: '' });
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const catalog = useMemo(() => getCatalog(), [refreshKey]);
 
@@ -37,13 +39,27 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
     return Array.from(cats).sort();
   }, [catalog]);
 
-
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return catalog
       .filter(c => c.item_code.toLowerCase().includes(q) || c.item_desc.toLowerCase().includes(q))
       .filter(c => categoryFilter === 'all' || c.category === categoryFilter);
   }, [catalog, search, categoryFilter]);
+
+  const toggleSelect = useCallback((code: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(code)) next.delete(code); else next.add(code);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = useCallback(() => {
+    setSelected(prev => {
+      if (prev.size === filtered.length) return new Set();
+      return new Set(filtered.map(i => i.item_code));
+    });
+  }, [filtered]);
 
   const handleQtyChange = useCallback((item_code: string, val: string) => {
     const qty = Math.max(0, parseInt(val) || 0);
@@ -111,7 +127,7 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
             <Button
               size="sm"
               className="w-full justify-center gap-2"
-              onClick={() => toast.info('Go to the BOM Explorer tab and use \"Select for Warehouse\" to add items.')}
+              onClick={() => toast.info('Go to the BOM Explorer tab and use "Select for Warehouse" to add items.')}
             >
               Import items from BOM Explorer
             </Button>
@@ -124,6 +140,8 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
       </div>
     );
   }
+
+  const allSelected = filtered.length > 0 && selected.size === filtered.length;
 
   return (
     <div className="flex flex-col h-full">
@@ -152,10 +170,23 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
         </Button>
       </div>
 
+      <BulkActionsBar
+        selectedCodes={Array.from(selected)}
+        onClear={() => setSelected(new Set())}
+        onRefresh={onRefresh}
+        categories={categories}
+      />
+
       <div className="flex-1 overflow-auto p-4">
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-10">
+                <Checkbox
+                  checked={allSelected}
+                  onCheckedChange={toggleSelectAll}
+                />
+              </TableHead>
               <TableHead className="w-40">Item Code</TableHead>
               <TableHead>Description</TableHead>
               <TableHead className="w-28">Category</TableHead>
@@ -172,7 +203,6 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
               const centralSerials = isSer ? getSerialsAtLocation(item.item_code, 'CENTRAL') : [];
               const centralQty = isSer ? centralSerials.length : getCentralQty(item.item_code);
 
-              // Calculate total across all locations
               let totalQty: number;
               if (isSer) {
                 totalQty = getSerials().filter(u => u.item_code === item.item_code).length;
@@ -183,14 +213,19 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
                 totalQty = centralQty + locQty;
               }
 
-              // Color logic for Qty On Hand
               const qtyColor = totalQty === 0 ? 'text-foreground'
                 : centralQty === 0 ? 'text-destructive'
                 : centralQty < totalQty ? 'text-amber-500'
                 : 'text-foreground';
 
               return (
-                <TableRow key={item.item_code}>
+                <TableRow key={item.item_code} data-state={selected.has(item.item_code) ? 'selected' : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selected.has(item.item_code)}
+                      onCheckedChange={() => toggleSelect(item.item_code)}
+                    />
+                  </TableCell>
                   <TableCell className="font-mono font-bold text-foreground">{item.item_code}</TableCell>
                   <TableCell className="text-muted-foreground">{item.item_desc}</TableCell>
                   <TableCell>
@@ -301,6 +336,7 @@ export default function CentralWarehouse({ onRefresh, refreshKey }: Props) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
       {/* Add Item Dialog */}
       <Dialog open={addItemOpen} onOpenChange={(open) => { setAddItemOpen(open); if (!open) setNewItem({ item_code: '', item_desc: '' }); }}>
         <DialogContent>
